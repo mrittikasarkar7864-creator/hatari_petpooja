@@ -31,7 +31,6 @@ import {
 } from '../redux/slice/cartSlice';
 import {postCustomizedFood} from '../redux/slice/CustomizeSlice';
 import Theme from '../assets/theme';
-import EvilIcons from 'react-native-vector-icons/EvilIcons';
 
 const {width, height} = Dimensions.get('window');
 
@@ -189,7 +188,11 @@ const OderCartScreen = () => {
             <TouchableOpacity
               style={styles.customizeBtn}
               onPress={() => openModal(item)}>
-              <EvilIcons name="pencil" size={16} color={Theme.colors.red} />
+              <Ionicons
+                name="pencil-outline"
+                size={16}
+                color={Theme.colors.red}
+              />
               <Text style={styles.customizeText}>Customize</Text>
             </TouchableOpacity>
 

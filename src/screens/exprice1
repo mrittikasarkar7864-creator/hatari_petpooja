@@ -20,10 +20,6 @@ import { useNavigation } from '@react-navigation/native';
 import { fetchNearestRestaurants } from '../redux/slice/nearestResSlice';
 import { setExperience, setRestaurant } from '../redux/slice/experienceSlice';
 import LocationErrorModal from './LocationErrorModal';
-import {
-  getClosedHoursMessage,
-  isOrderTypeBlockedNow,
-} from '../utils/restaurantHours';
 
 const experiences = [
   { id: 1, title: 'Delivery', icon: require('../assets/images/delivery.png') },
@@ -34,16 +30,15 @@ export default function ExperienceScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation();
 
-  const { experienceId, selectedRestaurant, experienceType } = useSelector(
-    state => state.experience,
-  );
+  const { experienceId, selectedRestaurant } = useSelector(state => state.experience);
   const { data, loading } = useSelector(state => state.nearestRestaurants);
-  console.log(data,"------------data from nearest restaurant slice");
-  
 
-  const [searching, setSearching] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [locationUsed, setLocationUsed] = useState(false);
+  const [searching, setSearching] = useState(true);
+  const [modalVisible, setModalVisible] = useState(true);
+
+  useEffect(() => {
+    initLocation();
+  }, []);
 
   useEffect(() => {
     if (data?.length) {
@@ -64,23 +59,11 @@ export default function ExperienceScreen() {
 
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
         setSearching(false);
-        setModalVisible(false);
         return;
       }
     }
 
     getLocation();
-  };
-
-  const showLocationExplanation = () => {
-    Alert.alert(
-      'Use My Location',
-      'We need your location to show nearby restaurants. Tap Allow to continue.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Allow', onPress: initLocation },
-      ],
-    );
   };
 
   const getLocation = () => {
@@ -97,13 +80,11 @@ export default function ExperienceScreen() {
 
         setSearching(false);
         setModalVisible(false);
-        setLocationUsed(true);
       },
       error => {
         console.log('LOCATION ERROR:', error);
 
         setSearching(false);
-        setModalVisible(false);
 
         Alert.alert(
           'Location Required',
@@ -134,12 +115,6 @@ export default function ExperienceScreen() {
       Alert.alert('Select restaurant and experience');
       return;
     }
-
-    if (isOrderTypeBlockedNow(experienceType, selectedRestaurant?.openingTime, selectedRestaurant?.closingTime)) {
-      Alert.alert('Restaurant Closed', getClosedHoursMessage(selectedRestaurant?.openingTime, selectedRestaurant?.closingTime));
-      return;
-    }
-
     navigation.navigate('Bottom', { screen: 'HomeScreen' });
   };
 
@@ -159,7 +134,6 @@ export default function ExperienceScreen() {
 
           <Text style={styles.heading}>Nearest Restaurants</Text>
 
-        
           {loading && <ActivityIndicator size="large" color="#fff" />}
 
           {data?.map(res => (
@@ -181,23 +155,13 @@ export default function ExperienceScreen() {
               <TouchableOpacity
                 key={item.id}
                 style={[styles.expCard, experienceId === item.id && styles.selected]}
-                onPress={() => {
-                  if (isOrderTypeBlockedNow(item.title, selectedRestaurant?.openingTime, selectedRestaurant?.closingTime)) {
-                    Alert.alert('Restaurant Closed', getClosedHoursMessage(selectedRestaurant?.openingTime, selectedRestaurant?.closingTime));
-                    return;
-                  }
-
-                  dispatch(setExperience({ id: item.id, type: item.title }));
-                }}
+                onPress={() => dispatch(setExperience({ id: item.id, type: item.title }))}
               >
                 <Image source={item.icon} style={styles.icon} />
                 <Text style={styles.text}>{item.title}</Text>
               </TouchableOpacity>
             ))}
           </View>
-
-
-          
 
           {experienceId && selectedRestaurant && (
             <TouchableOpacity onPress={continueNext}  style={styles.btn}>
@@ -206,14 +170,6 @@ export default function ExperienceScreen() {
               </LinearGradient>
             </TouchableOpacity>
           )}
-
-
-            {!locationUsed && !searching && (
-            <TouchableOpacity onPress={showLocationExplanation} style={styles.locationBtn}>
-              <Text style={styles.locationBtnText}>Use Current Location</Text>
-            </TouchableOpacity>
-          )}
-
         </SafeAreaView>
       </ImageBackground>
     </>
@@ -281,21 +237,5 @@ expCard: {
     fontSize: 18,
     textAlign: 'center',
     paddingVertical: 15, // vertical padding
-  },
-  locationBtn: {
-    marginBottom: 15,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: '#fff',
-    marginVertical:50
-  },
-  locationBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-    textAlign: 'center',
   },
 });

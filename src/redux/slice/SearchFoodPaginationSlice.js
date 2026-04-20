@@ -11,12 +11,26 @@ import { API } from "../../global_Url/GlobalUrl";
 export const fetchFoodPagination = createAsyncThunk(
   "foods/fetchFoodPagination",
   async (
-    { page = 1, limit = 10, type = "", search = "" },
+    { page = 1, limit = 10, type = "", search = "", restaurantId = "" },
     { rejectWithValue }
   ) => {
+    console.log(
+      "FETCHING FOODS - PAGE:",
+      page,
+      "TYPE:",
+      type,
+      "SEARCH:",
+      search,
+      "RESTAURANT ID:",
+      restaurantId,
+    );
     try {
       const response = await axiosInstance.get(
-        `${API.getfoodpagination}?page=${page}&limit=${limit}&type=${type}&search=${search}`
+        `${API.getfoodpagination}?page=${page}&limit=${limit}&type=${encodeURIComponent(
+          type,
+        )}&search=${encodeURIComponent(search)}&restaurantId=${encodeURIComponent(
+          restaurantId,
+        )}`
       );
 
       console.log("FILTER TYPE:", type);

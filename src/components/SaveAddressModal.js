@@ -11,6 +11,7 @@ import {
   Dimensions,
   Platform,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -69,6 +70,7 @@ const SaveAddressModal = ({
   const [area, setArea] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
 
   useEffect(() => {
     setAddress(location?.description || "");
@@ -77,6 +79,19 @@ const SaveAddressModal = ({
     setCity(addressDetails?.city || "");
     setState(addressDetails?.state || "");
   }, [location, addressDetails]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardOpen(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   /* ---------------- Distance ---------------- */
   const getDistanceKm = (lat1, lon1, lat2, lon2) => {
@@ -161,10 +176,16 @@ const SaveAddressModal = ({
       onRequestClose={onRequestClose}
     >
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.keyboardRoot}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? rh(2) : 0}
       >
-        <View style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            isKeyboardOpen && styles.modalContainerKeyboardOpen,
+          ]}
+        >
           
           <View style={styles.modalContent}>
             {/* Header */}
@@ -178,8 +199,14 @@ const SaveAddressModal = ({
             </View>
 
             <ScrollView
+              style={styles.formScroll}
+              contentContainerStyle={[
+                styles.formScrollContent,
+                isKeyboardOpen && styles.formScrollContentKeyboardOpen,
+              ]}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
             >
               <Text style={styles.header}>Enter complete address</Text>
 
@@ -298,10 +325,17 @@ export default SaveAddressModal;
 
 /* ================= STYLES ================= */
 const styles = StyleSheet.create({
+  keyboardRoot: {
+    flex: 1,
+  },
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  modalContainerKeyboardOpen: {
+    justifyContent: "flex-start",
+    paddingTop: rh(6),
   },
   modalContent: {
     backgroundColor: "#fff",
@@ -309,6 +343,15 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: rw(6),
     borderTopRightRadius: rw(6),
     maxHeight: rh(90),
+  },
+  formScroll: {
+    flexGrow: 0,
+  },
+  formScrollContent: {
+    paddingBottom: rh(2),
+  },
+  formScrollContentKeyboardOpen: {
+    paddingBottom: rh(8),
   },
   headerRow: {
     flexDirection: "row",
@@ -320,6 +363,7 @@ const styles = StyleSheet.create({
     fontSize: rf(2),
     fontWeight: "500",
     paddingRight: rw(2),
+    color: "#555",
   },
   header: {
     fontSize: rf(2.3),

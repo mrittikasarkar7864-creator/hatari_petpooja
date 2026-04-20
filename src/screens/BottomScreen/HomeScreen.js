@@ -48,7 +48,12 @@ const HomeScreen = () => {
   const cartItems = useSelector(s => s.cart.items || []);
   const totalCount = cartItems.length;
   console.log(totalCount, '----------------------totalCount');
-
+   const selectedRestaurant = useSelector(
+    state => state.experience.selectedRestaurant,
+  );
+  const resId = selectedRestaurant?._id;
+  console.log(resId, '----------------------resIdhome');
+  
 
   // const [selectedCuisine, setSelectedCuisine] = React.useState(null);
 
@@ -80,6 +85,8 @@ const HomeScreen = () => {
   const [selectedOption, setSelectedOption] = useState('half');
   const [quantity, setQuantity] = useState(1);
   const [foods, setFoods] = useState([]);
+  console.log(foods, "-------------------foods");
+  
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [baseTotal, setBaseTotal] = useState(0);
   const [addonsTotal, setAddonsTotal] = useState(0);
@@ -126,7 +133,7 @@ const HomeScreen = () => {
     return () => clearInterval(interval);
   }, [bannerlist]);
 
-  // Fetch Initial Data
+  // Fetch Initial Data and refresh when branch changes
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -144,16 +151,19 @@ const HomeScreen = () => {
             limit: 1000,
             isTrending: true,
             type: isVeg ? 'veg' : 'non-veg',
+            restaurantId: resId,
           }),
         ).unwrap();
+        console.log(res, "-------------------fetchCategoryFoods result-------------------");
 
         setFoods(res?.data || []);
       } finally {
         setLoading(false);
       }
     };
+
     loadData();
-  }, [dispatch, isVeg]);
+  }, [dispatch, isVeg, resId]);
 
   // Update totals
   useEffect(() => {
@@ -209,11 +219,11 @@ const HomeScreen = () => {
 
 
 
-  const selectedRestaurant = useSelector(
-    state => state.experience.selectedRestaurant,
-  );
+  // const selectedRestaurant = useSelector(
+  //   state => state.experience.selectedRestaurant,
+  // );
 
-  const isRestaurantActive = selectedRestaurant?.isActive !== false;
+   const isRestaurantActive = selectedRestaurant?.available !== false;
 
   const openModal2 = food => {
     setSelectedFood(food);
@@ -437,8 +447,13 @@ const HomeScreen = () => {
   );
 
   const renderItem = ({ item }) => {
+    console.log(item,"-------------------item in renderItem-------------------");
+    
+
     const dataItem = item?.food || item; // fallback
-    const isFoodAvailable = dataItem.available !== false; // true if available
+    console.log(dataItem,"-------------------dataItem in renderItem-------------------");
+    
+    const isFoodAvailable = resId && dataItem.available !== false; // true if available and restaurant selected
     console.log(isFoodAvailable, '--------------------isFoodAvailable');
 
     return (

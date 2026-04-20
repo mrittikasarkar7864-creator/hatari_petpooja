@@ -73,6 +73,10 @@ const CatItemScreen = () => {
 
   // API filter param
   const type = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
+   const selectedRestaurant = useSelector(
+    state => state.experience.selectedRestaurant,
+  );
+  const resId = selectedRestaurant?._id;
 
   useFocusEffect(
     useCallback(() => {
@@ -105,9 +109,10 @@ const CatItemScreen = () => {
         limit: 12,
         type,
         search: searchText,
+        restaurantId: resId,
       }),
     );
-  }, [dispatch, type, searchText]);
+  }, [dispatch, type, searchText, resId]);
 
   // Debounce API calls when searchText or type changes
   useEffect(() => {
@@ -135,6 +140,7 @@ const CatItemScreen = () => {
           limit: 12,
           type,
           search: searchText,
+          restaurantId: resId,
         }),
       );
     }
@@ -150,6 +156,7 @@ const CatItemScreen = () => {
           limit: 12,
           type,
           search: searchText,
+          restaurantId: resId,
         }),
       ).unwrap();
     } catch (err) {
@@ -303,7 +310,7 @@ const renderItem = ({ item }) => {
   const dataItem = item?.food || item; // fallback
 
 
-  const isFoodAvailable = dataItem.available !== false; // true if available
+  const isFoodAvailable = resId && dataItem.available !== false; // true if available
 
   return (
     <View style={styles.card}>
@@ -389,11 +396,9 @@ const renderItem = ({ item }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantity, selectedOption, selectedFood]);
 
-  const selectedRestaurant = useSelector(
-    state => state.experience.selectedRestaurant,
-  );
+ 
 
-  const isRestaurantActive = selectedRestaurant?.isActive !== false;
+  const isRestaurantActive = selectedRestaurant?.available !== false;
 
   return (
     <>

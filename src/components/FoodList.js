@@ -7,6 +7,7 @@ import {
   Image,
   FlatList,
   ScrollView,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import ShimmerPlaceholder from 'react-native-shimmer-placeholder';
@@ -23,6 +24,10 @@ import { fetchBanners } from '../../redux/slice/BannerSlice';
 import { fetchAllFoodCat } from '../../redux/slice/foodCategorySlice';
 import { fetchFoodPagination } from '../../redux/slice/SearchFoodPaginationSlice';
 import Theme from '../../assets/theme';
+import {
+  getClosedHoursMessage,
+  isOrderTypeBlockedNow,
+} from '../../utils/restaurantHours';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -209,6 +214,11 @@ const HomeScreen = () => {
                     selectedExperience === item.title && styles.activeExperience,
                   ]}
                   onPress={() => {
+                    if (isOrderTypeBlockedNow(item.title, selectedRestaurant?.openingTime, selectedRestaurant?.closingTime)) {
+                      Alert.alert('Restaurant Closed', getClosedHoursMessage(selectedRestaurant?.openingTime, selectedRestaurant?.closingTime));
+                      return;
+                    }
+
                     setSelectedExperience(item.title);
                     navigation.navigate(item.redirection);
                     dispatch(setExperience({ id: item.id, type: item.title }));

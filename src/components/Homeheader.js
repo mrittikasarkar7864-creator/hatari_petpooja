@@ -30,7 +30,6 @@ const HomeHeader = () => {
     state => state.experience
   );
   const restaurantList = useSelector(state => state.restaurants.list || []);
-  console.log('Restaurant list:', restaurantList);
   
   const cartItems = useSelector(state => state.cart.items || []);
   const totalCount = cartItems.length;
@@ -40,8 +39,6 @@ const HomeHeader = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyBranches, setNearbyBranches] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
-  console.log('Nearby branches:', nearbyBranches);
-  console.log('Filtered restaurants:', filteredRestaurants);
 
   // Get user location and filter branches - branches within 10km are selectable
   useEffect(() => {
@@ -49,7 +46,6 @@ const HomeHeader = () => {
       Geolocation.getCurrentPosition(
         position => {
           const { latitude, longitude } = position.coords;
-          console.log('User location:', { latitude, longitude });
           
           setUserLocation({ latitude, longitude });
 
@@ -92,7 +88,6 @@ const HomeHeader = () => {
           }
         },
         error => {
-          console.log('Geolocation error:', error);
           // Fallback: show all branches. First one is selectable.
           const withDefault = restaurantList.length > 0
             ? [restaurantList[0], ...restaurantList.slice(1)]

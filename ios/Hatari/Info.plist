@@ -2,28 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-<!-- add for location -->
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>Your location is needed to show nearby restaurants.</string>
-
-<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-<string>Your location is needed for accurate delivery tracking.</string>
-
-<key>NSLocationAlwaysUsageDescription</key>
-<string>Your location is needed for app functionality.</string>
-<!-- end -->
-
-<key>NSLocationWhenInUseUsageDescription</key>
-<string>Your location is needed to show map and address</string>
-<key>NSLocationAlwaysUsageDescription</key>
-<string>Your location is needed to show map and address</string>
-<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-<string>Your location is needed to show map and address</string>
-<key>io.flutter.embedded_views_preview</key>
-<true/>
-
-
-
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
@@ -53,21 +31,23 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Your location is needed to show map and address</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Your location is needed to show map and address</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Ionicons.ttf</string>
+		<string>MaterialIcons.ttf</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>
 	</array>
-  <key>UIAppFonts</key>
-  <array>
-    <string>Ionicons.ttf</string>
-    <string>MaterialIcons.ttf</string>
-  </array>
-
-	
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -76,5 +56,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>io.flutter.embedded_views_preview</key>
+	<true/>
 </dict>
 </plist>

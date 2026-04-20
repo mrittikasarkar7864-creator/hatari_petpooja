@@ -94,6 +94,8 @@ const OtpScreen = ({ route, navigation }) => {
     dispatch(verifyOtp({ phone, value })).then(async res => {
       if (res.meta.requestStatus === 'fulfilled') {
         const { token, user } = res.payload;
+        console.log(token, "------------ TOKEN");
+        
 
         await AsyncStorage.setItem('userToken', token);
         await AsyncStorage.setItem('userData', JSON.stringify(user));

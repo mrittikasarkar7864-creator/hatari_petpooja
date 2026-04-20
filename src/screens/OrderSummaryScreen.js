@@ -29,6 +29,10 @@ import {fetchUserAddresses} from '../redux/slice/saveaddressSlice';
 import {deleteUserAddress} from '../redux/slice/AddressDeleteSlice';
 import CustomHeader from '../components/CustomHeader';
 import {calculateTotalPackingCharge} from '../utils/packingChargesConfig';
+import {
+  getClosedHoursMessage,
+  isOrderTypeBlockedNow,
+} from '../utils/restaurantHours';
 
 const {width} = Dimensions.get('window');
 
@@ -191,6 +195,11 @@ const OrderSummaryScreen = () => {
   };
 
   const handleProceed = () => {
+    if (isOrderTypeBlockedNow(experienceType, selectedRestaurant?.openingTime, selectedRestaurant?.closingTime)) {
+      Alert.alert('Restaurant Closed', getClosedHoursMessage(selectedRestaurant?.openingTime, selectedRestaurant?.closingTime));
+      return;
+    }
+
     if (itemTotal < 500) {
       ToastAndroid.show('Minimum order amount is ₹500', ToastAndroid.SHORT);
       return;
@@ -205,6 +214,11 @@ const OrderSummaryScreen = () => {
   };
 
   const handleConfirmCOD = async () => {
+    if (isOrderTypeBlockedNow(experienceType, selectedRestaurant?.openingTime, selectedRestaurant?.closingTime)) {
+      Alert.alert('Restaurant Closed', getClosedHoursMessage(selectedRestaurant?.openingTime, selectedRestaurant?.closingTime));
+      return;
+    }
+
     const billingData = {
       userId: userid,
       restaurantId: selectedRestaurant?._id || '12345',

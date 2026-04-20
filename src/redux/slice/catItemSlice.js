@@ -12,11 +12,22 @@ export const fetchCategoryFoods = createAsyncThunk(
       cuisineType,
       page = 1,
       limit = 100,
-      search,
+      search = '',
       isTrending = true,
     },
     {rejectWithValue},
   ) => {
+    console.log('FETCHING CATEGORY FOODS - Params:', {
+      categoryId,
+      categoryIngredients,
+      restaurantId,
+      cuisineType,
+      page,
+      limit,
+      search,
+      isTrending,
+    });
+
     try {
       const params = new URLSearchParams();
 

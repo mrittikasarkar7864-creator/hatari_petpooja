@@ -26,6 +26,8 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
   console.log(categoriesState,"------------categoriesState");
   
   const categoriesData = categoriesState?.categories?.categories || [];
+  console.log(categoriesData,"---------categoriesData");
+  
 
 
   // Fetch categories when modal opens
@@ -40,8 +42,9 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
     }
   }, [visible, cuisineType, isVeg]);
 
-  // Filter categories based on veg/non-veg
+  // Filter categories based on veg/non-veg and isActive
   const filteredCategories = categoriesData.filter(item => {
+    if (item?.isActive === false) return false;
     if (!item?.type) return !isVeg;
     const types = Array.isArray(item.type)
       ? item.type.map(t => t.toLowerCase())
