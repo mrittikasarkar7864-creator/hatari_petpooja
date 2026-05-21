@@ -12,6 +12,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Easing,
+  ScrollView,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import ShimmerPlaceholder from 'react-native-shimmer-placeholder';
@@ -23,6 +24,7 @@ import { fetchRestaurants } from '../../redux/slice/AllRestaurantSlice';
 import { fetchBanners } from '../../redux/slice/BannerSlice';
 import { fetchAllFoodCat } from '../../redux/slice/foodCategorySlice';
 import { fetchCategoryFoods } from '../../redux/slice/catItemSlice';
+import { fetchFoodPagination } from '../../redux/slice/SearchFoodPaginationSlice';
 
 import DashboardScreen from '../../components/DashboardScreen';
 import SectionDivider from '../../components/SectionDivider';
@@ -53,7 +55,30 @@ const HomeScreen = () => {
   );
   const resId = selectedRestaurant?._id;
   console.log(resId, '----------------------resIdhome');
-  
+
+  const {
+    AllFoodsData = [],
+    parentCategories = [],
+    categories: petpoojaCategories = [],
+    menu = {},
+    page = 1,
+    hasMore = false,
+  } = useSelector(state => state.FoodPagination);
+
+  const menuGroups = Array.isArray(menu.groups) ? menu.groups : [];
+  const menuCategories = menuGroups.flatMap(group => group.categories || []);
+
+  const displayCategories = parentCategories.length
+    ? parentCategories
+    : petpoojaCategories.length
+    ? petpoojaCategories
+    : menuCategories.length
+    ? menuCategories
+    : [];
+
+  const openMenuGroup = (group) => {
+    dispatch(openCuisineModal(group));
+  };
 
   // const [selectedCuisine, setSelectedCuisine] = React.useState(null);
 
@@ -75,7 +100,7 @@ const HomeScreen = () => {
 
   const [loading, setLoading] = useState(true);
 
-  const { experienceId, experienceType } = useSelector(
+  const { experienceType } = useSelector(
     state => state.experience
   );
 
@@ -100,24 +125,7 @@ const HomeScreen = () => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const boxAnim = useRef(new Animated.Value(150)).current;
 
-  const categoridata = useSelector(state => state.categories);
-  console.log(
-    categoridata?.categoridata,
-    '----------------------------123good-------------------',
-  );
-  const categoridataList = categoridata?.categoridata || [];
-  console.log(
-    categoridataList,
-    '----------------------------categoridataList-------------------',
-  );
-  // 👇 Custom display order: 0 → 2 → 1
-  const categoryDisplayOrder = [0, 2, 1];
-
-  const orderedCategories = categoryDisplayOrder
-    .map(index => categoridataList[index])
-    .filter(Boolean);
-
-    console.log(orderedCategories,"-------");
+  const foodPaginationLoading = useSelector(state => state.FoodPagination.loading);
     
 
 
@@ -144,6 +152,18 @@ const HomeScreen = () => {
           dispatch(fetchAllFoodCat()),
           dispatch(fetchCategories()),
         ]);
+
+        if (resId) {
+          await dispatch(
+            fetchFoodPagination({
+              page: 1,
+              limit: 1,
+              type: isVeg ? 'veg' : 'non-veg',
+              search: '',
+              restaurantId: resId,
+            }),
+          ).unwrap();
+        }
 
         const res = await dispatch(
           fetchCategoryFoods({
@@ -415,20 +435,62 @@ const HomeScreen = () => {
 
       {/* Categories */}
       <SectionDivider title="What would you like to have today?" />
-      <View style={styles.categoryWrapper}>
-        {orderedCategories.map(item => (
-          <TouchableOpacity
-            key={item.id}
-            style={styles.categoryCard}
-            onPress={() => openModal(item)}>
-            <LinearGradient
-              colors={['#fd4b57ff', '#fefdfdff']}
-              style={styles.categoryCircle}>
-              <Image source={{ uri: item.image }} style={styles.categoryImage} />
-            </LinearGradient>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {foodPaginationLoading && displayCategories.length === 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryWrapper}
+        >
+          {[1, 2, 3, 4].map(index => (
+            <View key={index} style={styles.categoryShimmerCard}>
+              <ShimmerPlaceholder style={styles.categoryShimmerCircle} />
+              <ShimmerPlaceholder style={styles.categoryShimmerLabel} />
+            </View>
+          ))}
+        </ScrollView>
+      ) : displayCategories.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryWrapper}
+        >
+          {displayCategories.map((item, index) => {
+            const categoryImage = item?.image || item?.categoryImage || item?.item_image_url || item?.icon || '';
+            const categoryName = item?.name || item?.categoryName || item?.title || item?.label || 'Category';
+            const categoryKey = item?.categoryId || item?.id || item?._id || index;
+
+            return (
+              <TouchableOpacity
+                key={categoryKey}
+                style={styles.categoryCard}
+                onPress={() => openModal(item)}>
+                <LinearGradient
+                  colors={['#fff', '#fff']}
+                  style={styles.categoryCardInner}
+                >
+                  <LinearGradient
+                    colors={['#FF6C6C', '#FF4D4D']}
+                    style={styles.categoryCircle}
+                  >
+                    {categoryImage ? (
+                      <Image source={{ uri: categoryImage }} style={styles.categoryImage} />
+                    ) : (
+                      <View style={styles.categoryPlaceholder}>
+                        <Text style={styles.categoryPlaceholderText}>
+                          {categoryName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                </LinearGradient>
+                <Text style={styles.categoryName} numberOfLines={2}>
+                  {categoryName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      ) : null}
       {/* <HomeCatModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
@@ -441,92 +503,131 @@ const HomeScreen = () => {
         onClose={() => dispatch(closeCuisineModal())}
       />
 
+      {menuGroups.length > 0 && (
+        <>
+          <SectionDivider title="Explore Menu" />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.menuGroupWrapper}>
+            {menuGroups.map((group, index) => {
+              const categoriesCount = group.categories?.length || 0;
+              const itemsCount = group.categories?.reduce(
+                (sum, category) => sum + (category.items?.length || 0),
+                0,
+              );
+              return (
+                <TouchableOpacity
+                  key={group.groupId || group.name || index}
+                  style={styles.menuGroupCard}
+                  activeOpacity={0.85}
+                  onPress={() => openMenuGroup(group)}>
+                  <LinearGradient
+                    colors={['#ff7559', '#ff4a3c']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.menuGroupCardInner}>
+                    <View style={styles.menuGroupBadge}>
+                      <Text style={styles.menuGroupBadgeText}>Menu</Text>
+                    </View>
+                    <Text style={styles.menuGroupName} numberOfLines={2}>
+                      {group.name}
+                    </Text>
+                    <Text style={styles.menuGroupMeta} numberOfLines={2}>
+                      {itemsCount} items • {categoriesCount} categories
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </>
+      )}
 
-      <SectionDivider title={isVeg ? 'Top Veg Picks' : 'Top Non-Veg Picks'} />
     </>
   );
 
-  const renderItem = ({ item }) => {
-    console.log(item,"-------------------item in renderItem-------------------");
+  // const renderItem = ({ item }) => {
+  //   console.log(item,"-------------------item in renderItem-------------------");
     
 
-    const dataItem = item?.food || item; // fallback
-    console.log(dataItem,"-------------------dataItem in renderItem-------------------");
+  //   const dataItem = item?.food || item; // fallback
+  //   console.log(dataItem,"-------------------dataItem in renderItem-------------------");
     
-    const isFoodAvailable = resId && dataItem.available !== false; // true if available and restaurant selected
-    console.log(isFoodAvailable, '--------------------isFoodAvailable');
+  //   const isFoodAvailable = resId && dataItem.available !== false; // true if available and restaurant selected
+  //   console.log(isFoodAvailable, '--------------------isFoodAvailable');
 
-    return (
-      <View style={styles.card}>
-        <Image source={{ uri: dataItem.image }} style={styles.image} />
-        <View style={styles.details}>
-          <Text style={styles.cuisine}>
-            {dataItem?.cuisineType
-              ? dataItem.cuisineType.charAt(0).toUpperCase() +
-              dataItem.cuisineType.slice(1)
-              : ''}
-          </Text>
+  //   return (
+  //     <View style={styles.card}>
+  //       <Image source={{ uri: dataItem.image }} style={styles.image} />
+  //       <View style={styles.details}>
+  //         <Text style={styles.cuisine}>
+  //           {dataItem?.cuisineType
+  //             ? dataItem.cuisineType.charAt(0).toUpperCase() +
+  //             dataItem.cuisineType.slice(1)
+  //             : ''}
+  //         </Text>
 
-          <View style={styles.row}>
-            <View
-              style={[
-                styles.typeBox,
-                {
-                  borderColor:
-                    (dataItem.type || '').toLowerCase() === 'veg'
-                      ? 'green'
-                      : 'red',
-                },
-              ]}>
-              <View
-                style={[
-                  styles.typeDot,
-                  {
-                    backgroundColor:
-                      (dataItem.type || '').toLowerCase() === 'veg'
-                        ? 'green'
-                        : 'red',
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.name} numberOfLines={1}>
-              {dataItem?.name}
-            </Text>
-          </View>
+  //         <View style={styles.row}>
+  //           <View
+  //             style={[
+  //               styles.typeBox,
+  //               {
+  //                 borderColor:
+  //                   (dataItem.type || '').toLowerCase() === 'veg'
+  //                     ? 'green'
+  //                     : 'red',
+  //               },
+  //             ]}>
+  //             <View
+  //               style={[
+  //                 styles.typeDot,
+  //                 {
+  //                   backgroundColor:
+  //                     (dataItem.type || '').toLowerCase() === 'veg'
+  //                       ? 'green'
+  //                       : 'red',
+  //                 },
+  //               ]}
+  //             />
+  //           </View>
+  //           <Text style={styles.name} numberOfLines={1}>
+  //             {dataItem?.name}
+  //           </Text>
+  //         </View>
 
-          {dataItem.priceInfo?.hasVariation ? (
-            <>
-              <Text style={styles.priceText}>
-                Half: ₹{dataItem.priceInfo.halfPrice}
-              </Text>
-              <Text style={styles.priceText}>
-                Full: ₹{dataItem.priceInfo.fullPrice}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.priceText}>
-              Price: ₹{dataItem.priceInfo?.staticPrice}
-            </Text>
-          )}
-        </View>
+  //         {dataItem.priceInfo?.hasVariation ? (
+  //           <>
+  //             <Text style={styles.priceText}>
+  //               Half: ₹{dataItem.priceInfo.halfPrice}
+  //             </Text>
+  //             <Text style={styles.priceText}>
+  //               Full: ₹{dataItem.priceInfo.fullPrice}
+  //             </Text>
+  //           </>
+  //         ) : (
+  //           <Text style={styles.priceText}>
+  //             Price: ₹{dataItem.priceInfo?.staticPrice}
+  //           </Text>
+  //         )}
+  //       </View>
 
-        <TouchableOpacity
-          style={[styles.addBtn, !isFoodAvailable && { backgroundColor: '#ccc' }]}
-          onPress={() => {
-            if (!isFoodAvailable) {
-              alert('Food not available right now');
-              return;
-            }
-            openModal2(dataItem);
-          }}>
-          <Text style={styles.addText}>
-            {isFoodAvailable ? 'Add' : 'Not Available'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  //       <TouchableOpacity
+  //         style={[styles.addBtn, !isFoodAvailable && { backgroundColor: '#ccc' }]}
+  //         onPress={() => {
+  //           if (!isFoodAvailable) {
+  //             alert('Food not available right now');
+  //             return;
+  //           }
+  //           openModal2(dataItem);
+  //         }}>
+  //         <Text style={styles.addText}>
+  //           {isFoodAvailable ? 'Add' : 'Not Available'}
+  //         </Text>
+  //       </TouchableOpacity>
+  //     </View>
+  //   );
+  // };
 
 
 
@@ -542,7 +643,7 @@ const HomeScreen = () => {
           <FlatList
             data={filteredFoods}
             keyExtractor={(item, index) => item?._id || index.toString()}
-            renderItem={renderItem}
+            // renderItem={renderItem}
             ListHeaderComponent={renderHeader}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
@@ -888,34 +989,137 @@ const styles = StyleSheet.create({
   },
 
   categoryWrapper: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 10,
+    paddingLeft: 16,
+    paddingBottom: 12,
+  },
+  menuGroupWrapper: {
+    paddingLeft: 16,
+    paddingBottom: 22,
+    paddingRight: 16,
+  },
+  menuGroupCard: {
+    width: 172,
+    borderRadius: 22,
+    marginRight: 14,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.09,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  menuGroupCardInner: {
+    flex: 1,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    minHeight: 135,
+  },
+  menuGroupBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.24)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  menuGroupBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  menuGroupName: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '800',
+    marginBottom: 8,
+    lineHeight: 22,
+  },
+  menuGroupMeta: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.95)',
+    lineHeight: 18,
   },
   categoryCard: {
+    width: 100,
     alignItems: 'center',
-    // marginRight: 20,
-    paddingHorizontal: 10,
+    marginRight: 14,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 4,
   },
-  categoryCircle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+  categoryCardInner: {
+    width: 76,
+    height: 76,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
+    shadowColor: '#FF4D4D',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  categoryCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   categoryImage: {
-    width: 55,
-    height: 55,
-    borderRadius: 30,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+  },
+  categoryPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  categoryPlaceholderText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 18,
   },
   categoryName: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#333',
     fontWeight: '700',
-    marginTop: 8,
+    marginTop: 10,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  categoryShimmerCard: {
+    width: 100,
+    alignItems: 'center',
+    marginRight: 14,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
+  },
+  categoryShimmerCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 12,
+  },
+  categoryShimmerLabel: {
+    width: 60,
+    height: 16,
+    borderRadius: 8,
   },
 
   exploreBtn: {

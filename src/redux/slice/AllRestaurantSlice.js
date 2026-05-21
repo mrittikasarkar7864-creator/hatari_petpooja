@@ -7,8 +7,12 @@ export const fetchRestaurants = createAsyncThunk(
   'restaurants/fetchRestaurants',
   async (_, {rejectWithValue}) => {
     try {
-      const response = await axiosInstance.get(API.allRestaurant);
-      // console.log(response, '--------------res');
+      const response = await axiosInstance.get(API.allRestaurant, {
+        params: {
+          mode: 'all',
+        },
+      });
+      console.log(response, '--------------res');
 
       return response.data;
     } catch (error) {
@@ -28,6 +32,9 @@ const AllRestaurantSlice = createSlice({
     clearRestaurants: state => {
       state.list = [];
     },
+    resetBranchInfo: state => {
+      state.list = [];
+    },
   },
   extraReducers: builder => {
     builder
@@ -37,17 +44,13 @@ const AllRestaurantSlice = createSlice({
       })
       .addCase(fetchRestaurants.fulfilled, (state, action) => {
         state.loading = false;
-        state.list = action.payload.data || [];
+        state.list = action.payload.restaurants || [];
       })
       .addCase(fetchRestaurants.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
-      
   },
-  resetBranchInfo :state => {
-      state.list = [];
-    },
 });
 
 export const {clearRestaurants,resetBranchInfo} = AllRestaurantSlice.actions;

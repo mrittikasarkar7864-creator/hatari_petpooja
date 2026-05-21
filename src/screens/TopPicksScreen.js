@@ -278,7 +278,7 @@ const TopPicksScreen = () => {
 
   return (
     <>
-      <CustomHeader title={categoryName ?? "Top Picks"} />
+      <CustomHeader title={categoryName } />
       <DashboardScreen scrollable={false}>
         <View style={styles.container}>
           {filteredFoods.length === 0 && !loading ? (

@@ -41,15 +41,30 @@ const SearchScreen = () => {
     state => state.FoodPagination,
   );
   const isVeg = useSelector(state => state.foodFilter.isVeg);
+  const selectedRestaurant = useSelector(state => state.experience.selectedRestaurant);
+  const restaurantId = selectedRestaurant?._id;
   const cartItems = useSelector(state => state.cart.items);
 
   const totalItemCount = cartItems.length;
   const totalPrice = selectedFood ? selectedFood.price * quantity : 0;
 
-  // ✅ Fetch data once
   useEffect(() => {
-    dispatch(fetchFoodPagination({page: 1, limit: 70, type: isVeg}));
-  }, [dispatch]);
+    if (!restaurantId) return;
+
+    const timer = setTimeout(() => {
+      dispatch(
+        fetchFoodPagination({
+          page: 1,
+          limit: 70,
+          type: isVeg ? 'veg' : 'non-veg',
+          search,
+          restaurantId,
+        }),
+      );
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [dispatch, restaurantId, isVeg, search]);
 
   // ✅ Proper Veg / Non-Veg + Search filter
   const filteredResults = AllFoodsData.filter(item => {
@@ -79,10 +94,18 @@ const SearchScreen = () => {
 
   // ✅ Load more pagination
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) {
-      dispatch(fetchFoodPagination({page: page + 1, limit: 10}));
+    if (!loading && hasMore && restaurantId) {
+      dispatch(
+        fetchFoodPagination({
+          page: page + 1,
+          limit: 10,
+          type: isVeg ? 'veg' : 'non-veg',
+          search,
+          restaurantId,
+        }),
+      );
     }
-  }, [dispatch, page, hasMore, loading]);
+  }, [dispatch, page, hasMore, loading, restaurantId, isVeg, search]);
 
   // ✅ Footer Loader
   const renderFooter = () => {

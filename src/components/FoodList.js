@@ -41,6 +41,7 @@ const HomeScreen = () => {
   const { experienceId, selectedRestaurant, experienceType } = useSelector(
     state => state.experience,
   );
+  const restaurantId = selectedRestaurant?._id;
   const { categories } = useSelector(state => state.foodCategory);
   const { list: restaurantsArray } = useSelector(state => state.restaurants);
   const { bannerlist } = useSelector(state => state.banners);
@@ -57,20 +58,39 @@ const HomeScreen = () => {
 
   const flatListRef = useRef(null);
 
+  const topPicksData = (categories?.foods && categories.foods.length > 0) ? categories.foods : AllFoodsData;
+
   // Fetch data
   useEffect(() => {
     dispatch(fetchRestaurants());
     dispatch(fetchBanners());
     dispatch(fetchAllFoodCat());
-    dispatch(fetchFoodPagination({ page: 1, limit: 10 }));
+
+    if (restaurantId) {
+      dispatch(
+        fetchFoodPagination({
+          page: 1,
+          limit: 10,
+          type: isVeg ? 'veg' : 'non-veg',
+          restaurantId,
+        }),
+      );
+    }
 
     const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
-  }, [dispatch]);
+  }, [dispatch, restaurantId, isVeg]);
 
   const handleLoadMore = () => {
-    if (hasMore) {
-      dispatch(fetchFoodPagination({ page: page + 1, limit: 9 }));
+    if (hasMore && restaurantId) {
+      dispatch(
+        fetchFoodPagination({
+          page: page + 1,
+          limit: 9,
+          type: isVeg ? 'veg' : 'non-veg',
+          restaurantId,
+        }),
+      );
     }
   };
 
@@ -159,8 +179,8 @@ const HomeScreen = () => {
       {/* ✅ Main Scrollable FlatList (no nested scroll issues) */}
       <FlatList
         ref={flatListRef}
-        data={AllFoodsData.slice(0, visibleCount)}
-        keyExtractor={(item, index) => item?.food?._id || index.toString()}
+        data={topPicksData.slice(0, visibleCount)}
+        keyExtractor={(item, index) => item?._id || item?.food?._id || index.toString()}
         numColumns={3}
         columnWrapperStyle={{ justifyContent: 'space-between' }}
         showsVerticalScrollIndicator={false}
@@ -289,41 +309,51 @@ const HomeScreen = () => {
             <SectionDivider title="Top Picks" containerStyle={{ marginVertical: 10 }} />
           </>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.topPickCard}
-            activeOpacity={0.8}
-            onPress={() =>
-              navigation.navigate('CatItemScreen', {
-                categoryId: item?.food?._id,
-                categoryName: item?.food?.name,
-                categoryType: item?.food?.type,
-                categoryIngredients: item?.food?.ingredients,
-                restaurantId: selectedRestaurant?._id,
-              })
-            }>
-            <View style={styles.topPickCircle}>
-              <Image
-                source={{ uri: item?.food?.image }}
-                style={styles.topPickImage}
-                resizeMode="cover"
-              />
-            </View>
-            <Text style={styles.topPickTitle} numberOfLines={1}>
-              {item?.food?.name}
-            </Text>
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          const display = item?.food || item;
+          return (
+            <TouchableOpacity
+              style={styles.topPickCard}
+              activeOpacity={0.8}
+              onPress={() =>
+                navigation.navigate('CatItemScreen', {
+                  categoryId: display?._id,
+                  categoryName: display?.name,
+                  categoryType: display?.type,
+                  categoryIngredients: display?.ingredients,
+                  restaurantId: selectedRestaurant?._id,
+                })
+              }>
+              <View style={styles.topPickCircle}>
+                <Image
+                  source={{ uri: display?.image }}
+                  style={styles.topPickImage}
+                  resizeMode="cover"
+                />
+              </View>
+              <Text style={styles.topPickTitle} numberOfLines={1}>
+                {display?.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
         ListFooterComponent={() =>
-          visibleCount < AllFoodsData.length ? (
+          visibleCount < topPicksData.length ? (
             <TouchableOpacity
               style={styles.exploreBtn}
               onPress={() => {
                 const newCount = visibleCount + 9;
-                if (newCount <= AllFoodsData.length) {
+                if (newCount <= topPicksData.length) {
                   setVisibleCount(newCount);
-                } else if (hasMore) {
-                  dispatch(fetchFoodPagination({ page: page + 1, limit: 9 }));
+                } else if (hasMore && restaurantId) {
+                  dispatch(
+                    fetchFoodPagination({
+                      page: page + 1,
+                      limit: 9,
+                      type: isVeg ? 'veg' : 'non-veg',
+                      restaurantId,
+                    }),
+                  );
                 }
               }}>
               <View style={styles.exploreContainer}>

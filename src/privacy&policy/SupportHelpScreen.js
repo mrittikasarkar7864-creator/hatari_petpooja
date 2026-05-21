@@ -10,6 +10,7 @@ import {
   Platform,
   UIManager,
 } from "react-native";
+import { useSelector } from "react-redux";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental &&
@@ -47,7 +48,21 @@ const FAQS = [
 // ...same imports and FAQS...
 
 export default function SupportHelpScreen() {
+
   const [activeIndex, setActiveIndex] = useState(null);
+
+const selectedRestaurant = useSelector(
+  state => state.experience.selectedRestaurant
+);
+
+console.log(selectedRestaurant, "------Support------");
+
+const supportNumber =
+  selectedRestaurant?.supportContact?.mobileNumber || "0000000000";
+
+const managerName =
+  selectedRestaurant?.supportContact?.managerName || "Hatari Support";
+
 
   const toggleFAQ = (index) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -77,28 +92,33 @@ export default function SupportHelpScreen() {
         </View>
 
         {/* Contact Support */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Contact Us</Text>
-<ContactButton
-  text="📞 Call Support"
-  onPress={() => Linking.openURL("tel:+918961133339")} // no spaces
-/>
+      {/* Contact Support */}
+<View style={styles.card}>
+  <Text style={styles.sectionTitle}>Contact Us</Text>
 
+ 
 
-          <ContactButton
-            text="✉️ Email Support"
-            onPress={() =>
-              Linking.openURL("mailto:hatari.app1966@gmail.com")
-            }
-          />
+  <ContactButton
+    text={`📞 Call ${managerName}`}
+    onPress={() =>
+      Linking.openURL(`tel:+91${supportNumber}`)
+    }
+  />
 
-          <ContactButton
-            text="💬 WhatsApp Support"
-            onPress={() =>
-              Linking.openURL("https://wa.me/8961133339")
-            }
-          />
-        </View>
+  <ContactButton
+    text="✉️ Email Support"
+    onPress={() =>
+      Linking.openURL("mailto:hatari.app1966@gmail.com")
+    }
+  />
+
+  <ContactButton
+    text={`💬 WhatsApp ${managerName}`}
+    onPress={() =>
+      Linking.openURL(`https://wa.me/91${supportNumber}`)
+    }
+  />
+</View>
 
         {/* Important Policy */}
         <View style={styles.card}>

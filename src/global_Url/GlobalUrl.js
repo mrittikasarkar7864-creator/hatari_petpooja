@@ -1,20 +1,23 @@
 // Api/Global_Api.js
 export const BASE_URL = 'https://hatari.backend.sensegeofence.com/api/';
+export const petpooja_url ='https://petpooja.sensegeofence.com/api/'
 // export const BASE_URL = 'https://api.hatarirestaurant.com/api/';
 
 // export const BASE_URL  = 'http://192.168.1.13:3006/api/'
 export const API = {
-  sendOtp: `${BASE_URL}auth/sendOtp`,
-  verifyOtp: `${BASE_URL}auth/verifyOtp`,
-  nearestRasturance: `${BASE_URL}restaurant/getAllRestaurants`,
-  allRestaurant: `${BASE_URL}restaurant/list`,
+  sendOtp: `${petpooja_url}auth/otp/send`,
+  verifyOtp: `${petpooja_url}auth/otp/verify`,
+  nearestRasturance: `${petpooja_url}restaurants`,
+  allRestaurant: `${petpooja_url}restaurants`,
+  
   getbannerHome : `${BASE_URL}banner/getAll`,
-  getallfoods : `${BASE_URL}food/foods`,
+  // getallfoods : `${petpooja_url}petpooja/normalized-menu?restaurantId=52120`,
+  // getCatItemfoods : `${petpooja_url}petpooja/normalized-menu?restaurantId=52120`,
+  getfoodpagination : `${petpooja_url}petpooja/normalized-menu`,
+  postandUploadCat : `${petpooja_url}cart/update`,
   AllFoodCat :`${BASE_URL}catfood/allFoodCatActive`,
   customizeFood:`${BASE_URL}cart/add`,
-  getCatItemfoods : `${BASE_URL}food/foods`,
   getmenutemfoods : `${BASE_URL}food/foods`,
-  getfoodpagination :`${BASE_URL}food/foods`,
   addAddressPost:`${BASE_URL}users/addAddress`,
   deliverySettings :`${BASE_URL}setting/deliverySettings`,
   tableBooking :`${BASE_URL}booking`,

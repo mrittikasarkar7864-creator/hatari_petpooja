@@ -30,6 +30,8 @@ import SupportHelpScreen from '../privacy&policy/SupportHelpScreen';
 const Stack = createStackNavigator();
 
 const StackNav = () => {
+
+  
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
 

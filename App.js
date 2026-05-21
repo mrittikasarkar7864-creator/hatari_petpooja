@@ -10,7 +10,7 @@ import VersionCheck from 'react-native-version-check';
 
 const App = () => {
   const hasCheckedForUpdate = useRef(false);
-
+{/* <text>ghgyhg</text> */}
   useEffect(() => {
     if (hasCheckedForUpdate.current) {
       return;

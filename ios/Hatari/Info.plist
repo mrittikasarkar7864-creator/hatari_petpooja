@@ -35,8 +35,14 @@
 	<string>Your location is needed to show map and address</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Your location is needed to show map and address</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Your location is needed to show map and address</string>
+
+<key>NSLocationAlwaysUsageDescription</key>
+<string>Your location is needed to show map and address</string>
+
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Your location is needed to show nearby restaurants and delivery address</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Ionicons.ttf</string>

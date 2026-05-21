@@ -163,15 +163,32 @@ export default function ExperienceScreen() {
           {loading && <ActivityIndicator size="large" color="#fff" />}
 
           {data?.map(res => (
-            <TouchableOpacity
-              key={res._id}
-              style={[styles.card, selectedRestaurant?._id === res._id && styles.selected]}
-              onPress={() => dispatch(setRestaurant(res))}
-            >
-              <Image source={{ uri: res.image }} style={styles.image} />
-              <Text style={styles.name}>{res.name}</Text>
-              <Text style={styles.text}>{res.address}</Text>
-            </TouchableOpacity>
+         <TouchableOpacity
+  key={res.restaurantId}
+  style={[
+    styles.card,
+    selectedRestaurant?.restaurantId === res.restaurantId &&
+      styles.selected,
+  ]}
+  onPress={() => dispatch(setRestaurant(res))}
+>
+{/* <Image
+  source={
+    res.image
+      ? { uri: res.image }
+      : require('../assets/images/restaurant.png')
+  }
+  style={styles.image}
+/> */}
+
+  <Text style={styles.name}>{res.name}</Text>
+
+  <Text style={styles.text}>{res.address}</Text>
+
+  <Text style={styles.text}>
+    {res.distance_km?.toFixed(1)} km away
+  </Text>
+</TouchableOpacity>
           ))}
 
           <Text style={styles.heading}>Choose Experience</Text>

@@ -76,7 +76,12 @@ const CatItemScreen = () => {
    const selectedRestaurant = useSelector(
     state => state.experience.selectedRestaurant,
   );
-  const resId = selectedRestaurant?._id;
+
+  // derive a stable restaurant id from multiple possible fields
+  const getRestaurantId = (restaurant) =>
+    restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id ?? '';
+
+  const resId = getRestaurantId(selectedRestaurant);
 
   useFocusEffect(
     useCallback(() => {
@@ -106,7 +111,7 @@ const CatItemScreen = () => {
     dispatch(
       fetchFoodPagination({
         page: 1,
-        limit: 12,
+        limit: 10,
         type,
         search: searchText,
         restaurantId: resId,
@@ -137,7 +142,7 @@ const CatItemScreen = () => {
       dispatch(
         fetchFoodPagination({
           page: page + 1,
-          limit: 12,
+          limit: 10,
           type,
           search: searchText,
           restaurantId: resId,
@@ -153,7 +158,7 @@ const CatItemScreen = () => {
       await dispatch(
         fetchFoodPagination({
           page: 1,
-          limit: 12,
+          limit: 10,
           type,
           search: searchText,
           restaurantId: resId,

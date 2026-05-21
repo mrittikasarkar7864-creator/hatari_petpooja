@@ -1,53 +1,121 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import axios from "axios";
 import { API } from "../../global_Url/GlobalUrl";
 import axiosInstance from "../../global_Url/axiosInstance";
 
-// Fetch nearest restaurants
+/* ================= FETCH NEAREST RESTAURANTS ================= */
+
 export const fetchNearestRestaurants = createAsyncThunk(
   "restaurants/fetchNearest",
-  async ({  lat, lng }, { rejectWithValue }) => {
-    try {
-      const response = await axiosInstance.get(API.nearestRasturance, {
-        params: { lat, lng }
-       
-      });
 
-      // Optional: sort by distance if API does not
-      const sorted = response.data.sort((a, b) => a.distance - b.distance);
-      return sorted;
+  async ({ lat, lng }, { rejectWithValue }) => {
+    console.log("FETCHING NEAREST RESTAURANTS =>", lat, lng);
+    
+    try {
+      console.log("FETCHING RESTAURANTS =>", lat, lng);
+
+      const response = await axiosInstance.get(
+        API.nearestRasturance,
+        {
+          params: {
+            lat,
+            lng,
+            mode: "nearest",
+          },
+        }
+      );
+
+      console.log(
+        "NEAREST RESTAURANTS RESPONSE =>",
+        response
+      );
+
+      // API response array
+      const restaurants =
+        response?.data?.restaurants || [];
+
+      // sort nearest first
+      const sortedRestaurants = [...restaurants].sort(
+        (a, b) =>
+          Number(a?.distance_km || 0) -
+          Number(b?.distance_km || 0)
+      );
+
+      return sortedRestaurants;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      console.log(
+        "FETCH RESTAURANTS ERROR =>",
+        error?.response?.data || error.message
+      );
+
+      return rejectWithValue(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Something went wrong"
+      );
     }
   }
 );
 
+/* ================= SLICE ================= */
+
 const nearestResSlice = createSlice({
   name: "nearestRestaurants",
-  initialState: { data: [], loading: false, error: null },
+
+  initialState: {
+    data: [],
+    loading: false,
+    error: null,
+  },
+
   reducers: {
-    clearRestaurants: (state) => {
+    clearRestaurants: state => {
       state.data = [];
       state.loading = false;
       state.error = null;
     },
   },
-  extraReducers: (builder) => {
+
+  extraReducers: builder => {
     builder
-      .addCase(fetchNearestRestaurants.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchNearestRestaurants.fulfilled, (state, action) => {
-        state.loading = false;
-        state.data = action.payload;
-      })
-      .addCase(fetchNearestRestaurants.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || "Failed to fetch restaurants";
-      });
+
+      /* ===== PENDING ===== */
+
+      .addCase(
+        fetchNearestRestaurants.pending,
+        state => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
+
+      /* ===== SUCCESS ===== */
+
+      .addCase(
+        fetchNearestRestaurants.fulfilled,
+        (state, action) => {
+          state.loading = false;
+          state.data = action.payload || [];
+        }
+      )
+
+      /* ===== FAILED ===== */
+
+      .addCase(
+        fetchNearestRestaurants.rejected,
+        (state, action) => {
+          state.loading = false;
+
+          state.error =
+            action.payload ||
+            "Failed to fetch restaurants";
+        }
+      );
   },
 });
 
-export const { clearRestaurants } = nearestResSlice.actions;
+/* ================= EXPORTS ================= */
+
+export const { clearRestaurants } =
+  nearestResSlice.actions;
+
 export default nearestResSlice.reducer;

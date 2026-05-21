@@ -28,6 +28,8 @@ const LoginScreen = () => {
   const { loading } = useSelector(state => state.auth);
 
   const [phone, setPhone] = useState('');
+  console.log(phone,"---------phone");
+  
 
   // Animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -64,6 +66,8 @@ const LoginScreen = () => {
     }
 
     dispatch(sendOtp(phone)).then(res => {
+      console.log(res,"----------res");
+      
       if (res.meta.requestStatus === 'fulfilled') {
         Platform.OS === 'android'
           ? ToastAndroid.show('OTP Sent Successfully ✔', ToastAndroid.SHORT)
@@ -106,7 +110,7 @@ const LoginScreen = () => {
                 source={require('../../assets/images/Cover/logo.png')}
                 style={styles.logo}
               />
-              <Text style={styles.tagline}>Chinese • Indian • Tandoor</Text>
+              <Text style={styles.tagline}>Simmer</Text>
             </Animated.View>
 
             {/* Login Card */}

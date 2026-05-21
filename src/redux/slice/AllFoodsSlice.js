@@ -26,6 +26,7 @@ export const fetchAllFoods = createAsyncThunk(
           type,
           page,
           limit,
+          restaurantId
         },
       });
 
@@ -36,6 +37,7 @@ export const fetchAllFoods = createAsyncThunk(
         total: response.data?.total || 0,
         page,
         limit,
+        restaurantId
       };
     } catch (error) {
       console.error("Error fetching foods:", error.response?.data || error.message);

@@ -30,7 +30,7 @@ const Splash = () => {
                 resizeMode="contain"
             />
             <Text style={styles.subTagline}>Elevate Your Dining Experience</Text>
-            <Text style={styles.cuisine}>Chinese • Indian • Tandoor</Text>
+            <Text style={styles.cuisine}>Simmer</Text>
             </View>
          </DashboardScreen>
     );

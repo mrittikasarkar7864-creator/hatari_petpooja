@@ -18,6 +18,7 @@ import Theme from '../../assets/theme';
 import {fetchUserProfile} from '../../redux/slice/profileSlice';
 
 const ProfileScreen = ({navigation}) => {
+  
   const dispatch = useDispatch();
   const userData = useSelector(state => state.profile);
 

@@ -30,7 +30,20 @@ const HomeHeader = () => {
     state => state.experience
   );
   const restaurantList = useSelector(state => state.restaurants.list || []);
+  console.log(restaurantList,"restaurantList");
+
+  const getRestaurantId = restaurant =>
+    restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id;
+
+  const selectedRestaurantId = getRestaurantId(selectedRestaurant);
+  console.log(selectedRestaurantId,"---------------------------------selectedRestaurantId");
   
+
+  const isRestaurantAvailable = restaurant =>
+    restaurant?.is_open !== false &&
+    restaurant?.store_status !== 0 &&
+    restaurant?.isActive !== false;
+
   const cartItems = useSelector(state => state.cart.items || []);
   const totalCount = cartItems.length;
 
@@ -69,7 +82,7 @@ const HomeHeader = () => {
 
           // Auto-select nearest in-range branch if current selection is missing/out-of-range
           const selectedIsInRange = withinDeliveryRange.some(
-            branch => branch._id === selectedRestaurant?._id
+            branch => getRestaurantId(branch) === selectedRestaurantId
           );
 
           if (!selectedRestaurant || !selectedIsInRange) {
@@ -119,7 +132,9 @@ const HomeHeader = () => {
     }
   }, [restaurantList]);
 
-  const selectableIds = new Set(nearbyBranches.map(branch => branch._id));
+  const selectableIds = new Set(
+    nearbyBranches.map(branch => getRestaurantId(branch))
+  );
   const inRangeCount = nearbyBranches.length;
 
   return (
@@ -162,11 +177,7 @@ const HomeHeader = () => {
                 />
                 <View style={{ maxWidth: '70%' }}>
                   <Text style={styles.branchText} numberOfLines={1}>
-                    {selectedRestaurant
-                      ? selectedRestaurant.isActive
-                        ? selectedRestaurant.name
-                        : 'Restaurant not available'
-                      : 'Select Branch'}
+                    {selectedRestaurant?.name || 'Select Branch'}
                   </Text>
                 </View>
                 <Image
@@ -228,20 +239,24 @@ const HomeHeader = () => {
 
           <ScrollView style={{ maxHeight: 250 }}>
             {filteredRestaurants.map((restaurant, index) => {
+              const restaurantId = getRestaurantId(restaurant);
+              const nearestRestaurantId = getRestaurantId(
+                filteredRestaurants[0]
+              );
+
               // Check if this is the nearest restaurant
-              const isNearest =
-                filteredRestaurants.length > 0 &&
-                filteredRestaurants[0]._id === restaurant._id;
+              const isNearest = nearestRestaurantId === restaurantId;
 
               // Selectable if within 10km delivery range (or fallback first branch)
-              const isWithinRange = selectableIds.has(restaurant._id);
+              const isWithinRange = selectableIds.has(restaurantId);
 
               // Disable if out of range or inactive
-              const isDisabled = !isWithinRange || restaurant.isActive === false;
+              const isDisabled =
+                !isWithinRange || !isRestaurantAvailable(restaurant);
 
               return (
                 <TouchableOpacity
-                  key={restaurant._id || index}
+                  key={restaurantId || index}
                   style={[
                     styles.dropdownItem,
                     isNearest && styles.nearestHighlight,
@@ -269,7 +284,7 @@ const HomeHeader = () => {
                       <Text
                         style={[
                           styles.dropdownText,
-                          selectedRestaurant?._id === restaurant._id && {
+                          selectedRestaurantId === restaurantId && {
                             color: '#e91e3c',
                             fontWeight: 'bold',
                           },
@@ -282,7 +297,7 @@ const HomeHeader = () => {
                       {restaurant.isActive === false && (
                         <Text style={styles.inactiveText}>Currently unavailable</Text>
                       )}
-                      {restaurant.distance && (
+                      {typeof restaurant.distance === 'number' && (
                         <Text 
                           style={[
                             styles.distanceText,
@@ -292,11 +307,12 @@ const HomeHeader = () => {
                           {restaurant.distance.toFixed(1)} km away
                         </Text>
                       )}
-                      {!isWithinRange && restaurant.distance < Number.POSITIVE_INFINITY && (
-                        <Text style={styles.outOfRangeText}>
-                          Outside {DELIVERY_RADIUS_KM} km delivery range
-                        </Text>
-                      )}
+                      {!isWithinRange &&
+                        typeof restaurant.distance === 'number' && (
+                          <Text style={styles.outOfRangeText}>
+                            Outside {DELIVERY_RADIUS_KM} km delivery range
+                          </Text>
+                        )}
                     </View>
                     
                     {/* Show badge for nearest */}
