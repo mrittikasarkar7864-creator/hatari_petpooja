@@ -20,8 +20,16 @@ import DashboardScreen from '../components/DashboardScreen';
 import CustomHeader from '../components/CustomHeader';
 import {fetchFoodPagination} from '../redux/slice/SearchFoodPaginationSlice';
 import {addToCart} from '../redux/slice/cartSlice';
+import {
+  addItemToPetpoojaCart,
+  fetchPetpoojaCart,
+} from '../redux/slice/CartApiSlice';
 import LinearGradient from 'react-native-linear-gradient';
 import Theme from '../assets/theme';
+import {
+  getFoodTypeMeta,
+  shouldIncludeByVegFilter,
+} from '../utils/foodType';
 
 const SearchScreen = () => {
   const navigation = useNavigation();
@@ -42,8 +50,13 @@ const SearchScreen = () => {
   );
   const isVeg = useSelector(state => state.foodFilter.isVeg);
   const selectedRestaurant = useSelector(state => state.experience.selectedRestaurant);
-  const restaurantId = selectedRestaurant?._id;
+  const restaurantId =
+    selectedRestaurant?.restaurantId ||
+    selectedRestaurant?.petpoojaRestaurantId ||
+    selectedRestaurant?.id ||
+    selectedRestaurant?._id;
   const cartItems = useSelector(state => state.cart.items);
+  const apiType = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
 
   const totalItemCount = cartItems.length;
   const totalPrice = selectedFood ? selectedFood.price * quantity : 0;
@@ -56,7 +69,7 @@ const SearchScreen = () => {
         fetchFoodPagination({
           page: 1,
           limit: 70,
-          type: isVeg ? 'veg' : 'non-veg',
+          type: apiType,
           search,
           restaurantId,
         }),
@@ -64,30 +77,19 @@ const SearchScreen = () => {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [dispatch, restaurantId, isVeg, search]);
+  }, [dispatch, restaurantId, apiType, search]);
 
   // ✅ Proper Veg / Non-Veg + Search filter
   const filteredResults = AllFoodsData.filter(item => {
     const food = item?.food || {};
     const name = food?.name?.toLowerCase() || '';
-    const types = Array.isArray(food?.type)
-      ? food.type.map(t => t.toLowerCase())
-      : [String(food?.type || '').toLowerCase()];
 
     // Match search text
     const matchSearch =
       search.trim().length === 0 || name.includes(search.toLowerCase());
 
     // Match Veg / Non-Veg toggle
-    let matchVegFilter = true;
-    if (isVeg === true) {
-      matchVegFilter = types.includes('veg');
-    } else if (isVeg === false) {
-      matchVegFilter =
-        types.includes('non-veg') ||
-        types.includes('nonveg') ||
-        types.includes('chicken');
-    }
+    const matchVegFilter = shouldIncludeByVegFilter(food, isVeg);
 
     return matchSearch && matchVegFilter;
   });
@@ -99,13 +101,13 @@ const SearchScreen = () => {
         fetchFoodPagination({
           page: page + 1,
           limit: 10,
-          type: isVeg ? 'veg' : 'non-veg',
+          type: apiType,
           search,
           restaurantId,
         }),
       );
     }
-  }, [dispatch, page, hasMore, loading, restaurantId, isVeg, search]);
+  }, [dispatch, page, hasMore, loading, restaurantId, apiType, search]);
 
   // ✅ Footer Loader
   const renderFooter = () => {
@@ -142,17 +144,59 @@ const SearchScreen = () => {
 
   // ✅ Add to cart confirm
   const handleConfirmAdd = () => {
-    dispatch(addToCart({...selectedFood, quantity}));
-    closeModal();
+    if (!selectedFood) {
+      return;
+    }
 
-    // Show bottom box with animation
-    setBottomBoxVisible(true);
-    Animated.timing(boxAnim, {
-      toValue: 0,
-      duration: 400,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    const localCartItem = {
+      ...selectedFood,
+      id:
+        selectedFood?.id ||
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?._id,
+      itemId:
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?.id ||
+        selectedFood?._id,
+      quantity,
+    };
+
+    dispatch(addToCart(localCartItem));
+
+    const addAndNavigate = async () => {
+      try {
+        await dispatch(
+          addItemToPetpoojaCart({
+            restaurantId,
+            cartItem: localCartItem,
+          }),
+        ).unwrap();
+
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        closeModal();
+        navigation.navigate('OderCartScreen', {
+          petpoojaCartData: cartResponse?.cart || null,
+          fromPetpoojaSync: true,
+        });
+      } catch (e) {
+        closeModal();
+
+        // Keep current UX when API fails
+        setBottomBoxVisible(true);
+        Animated.timing(boxAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+    };
+
+    addAndNavigate();
   };
 
   const handleGoToCart = () => {
@@ -168,6 +212,7 @@ const SearchScreen = () => {
   // ✅ Render food card
   const renderItem = ({item}) => {
     const food = item?.food || {};
+    const typeMeta = getFoodTypeMeta(food);
     return (
       <TouchableOpacity
         key={food?._id?.toString()}
@@ -193,18 +238,14 @@ const SearchScreen = () => {
               style={[
                 styles.typeIndicator,
                 {
-                  borderColor: food?.type?.includes('non-veg')
-                    ? 'red'
-                    : 'green',
+                  borderColor: typeMeta.color,
                 },
               ]}>
               <View
                 style={[
                   styles.typeDot,
                   {
-                    backgroundColor: food?.type?.includes('veg')
-                      ? 'green'
-                      : 'red',
+                    backgroundColor: typeMeta.color,
                   },
                 ]}
               />

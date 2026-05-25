@@ -1,10 +1,10 @@
-// src/redux/slice/SearchFoodPaginationSlice.js
-
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axiosInstance from "../../global_Url/axiosInstance";
 import { API } from "../../global_Url/GlobalUrl";
 
-
+// ----------------------------------------------
+// THUNK
+// ----------------------------------------------
 export const fetchFoodPagination = createAsyncThunk(
   "foods/fetchFoodPagination",
   async (
@@ -13,51 +13,101 @@ export const fetchFoodPagination = createAsyncThunk(
   ) => {
     try {
       const params = { page, limit, type, search, restaurantId };
-      console.log('fetchFoodPagination -> params:', params);
 
       const response = await axiosInstance.get(API.getfoodpagination, { params });
 
-      console.log('fetchFoodPagination -> status:', response.status);
-      const foods = response?.data?.items || [];
-      const parentCategories = response?.data?.parentcategories || [];
-      const groupCategories = response?.data?.groupcategories || [];
-      const categories = response?.data?.categories || [];
-      const addOnGroups = response?.data?.addongroups || [];
-      const addOnItems = response?.data?.addonitems || [];
-      const attributes = response?.data?.attributes || [];
-      const discounts = response?.data?.discounts || [];
-      const taxes = response?.data?.taxes || [];
-      const menu = response?.data?.menu || {};
+      const data = response?.data || {};
 
-      console.log('fetchFoodPagination -> returned items count:', (foods && foods.length) || 0);
+      const foods = Array.isArray(data.items) ? data.items : [];
 
-      // Build a quick lookup for attributeId -> attribute name (petpooja)
+      const pagination = data.pagination || {};
+
+      const total = Number(pagination.totalItems || 0);
+      const returnedPage = Number(pagination.page || page);
+      const returnedLimit = Number(pagination.limit || limit);
+
       const attributeMap = {};
-      if (Array.isArray(attributes)) {
-        attributes.forEach((a) => {
-          const key = a.attributeId || a.attributeid || a._id || '';
-          attributeMap[String(key)] = (a.name || (a.rawPayload && a.rawPayload.attribute) || '').toLowerCase();
-        });
-      }
 
-      // Petpooja items come in a round format (itemId, price, variations, addons)
-      // Normalize each item to the shape expected by MenuScreen/HomeScreen
-      const normalizePetpooja = (it) => {
-        const raw = it || {};
+      (data.attributes || []).forEach((a) => {
+        const key = a.attributeId || a._id || "";
+        attributeMap[String(key)] = (a.name || "").toLowerCase();
+      });
 
-        // prefer `itemId` or `_id` as stable id
-        const id = raw.itemId || raw._id || raw.item_id || '';
+      const resolveFoodType = ({ attrId = "", attrName = "", name = "", raw = {} }) => {
+        const normalizedAttrId = String(attrId || "").trim();
+        const normalizedAttr = String(attrName || "").toLowerCase();
+        const text = `${name || ""} ${raw?.rawPayload?.itemname || ""}`.toLowerCase();
 
-        // image
-        const image = raw.item_image_url || raw.rawPayload?.item_image_url || raw.image || null;
+        // Priority 0: known Petpooja/common attribute-id fallback when name map is missing.
+        // This runs first only because attrName can be empty in partial payloads.
+        const knownAttrIdMap = {
+          "1": "veg",
+          "2": "non-veg",
+          "3": "egg",
+        };
 
-        // name
-        const name = raw.name || raw.itemname || raw.rawPayload?.itemname || '';
+        if (!normalizedAttr && knownAttrIdMap[normalizedAttrId]) {
+          return knownAttrIdMap[normalizedAttrId];
+        }
 
-        // availability
-        const available = raw.active !== false && (raw.in_stock === undefined || raw.in_stock > 0);
+        // Priority 1: explicit attribute mapping from API
+        if (normalizedAttr.includes("non")) return "non-veg";
+        if (normalizedAttr.includes("egg")) return "egg";
+        if (normalizedAttr.includes("veg")) return "veg";
 
-        // priceInfo: handle `variations` or single `price`
+        // Priority 2: keyword fallback when attributes are missing/inconsistent
+        const eggWords = ["egg", "omelette", "omelet"];
+        const nonVegWords = [
+          "non veg",
+          "non-veg",
+          "chicken",
+          "mutton",
+          "lamb",
+          "fish",
+          "prawn",
+          "shrimp",
+          "crab",
+          "seafood",
+          "bacon",
+          "ham",
+          "pepperoni",
+          "sausage",
+          "meat",
+          "kebab",
+          "keema",
+        ];
+        const vegHints = ["(veg)", " veg ", "veg.", "paneer", "mushroom", "soya", "tofu"];
+
+        if (eggWords.some((word) => text.includes(word))) return "egg";
+        if (nonVegWords.some((word) => text.includes(word))) return "non-veg";
+        if (vegHints.some((word) => text.includes(word))) return "veg";
+
+        // Safe default for unknown items
+        return "veg";
+      };
+
+      // ----------------------------------------------
+      // NORMALIZER
+      // ----------------------------------------------
+      const normalizePetpooja = (raw = {}) => {
+        const id = raw.itemId || raw._id || raw.item_id || "";
+
+        const image =
+          raw.item_image_url ||
+          raw.image ||
+          raw.rawPayload?.item_image_url ||
+          null;
+
+        const name =
+          raw.name ||
+          raw.itemname ||
+          raw.rawPayload?.itemname ||
+          "";
+
+        const available =
+          raw.active !== false &&
+          (raw.in_stock === undefined || raw.in_stock > 0);
+
         const priceInfo = {
           hasVariation: false,
           halfPrice: 0,
@@ -67,42 +117,34 @@ export const fetchFoodPagination = createAsyncThunk(
 
         if (Array.isArray(raw.variations) && raw.variations.length > 0) {
           priceInfo.hasVariation = true;
+
           const half = raw.variations[0] || {};
           const full = raw.variations[1] || raw.variations[0] || {};
-          priceInfo.halfPrice = Number(half.price || half.price || 0);
-          priceInfo.fullPrice = Number(full.price || full.price || 0);
-        } else if (raw.price !== undefined && raw.price !== null) {
-          priceInfo.staticPrice = Number(raw.price || 0);
-        } else if (raw.rawPayload && raw.rawPayload.price) {
-          priceInfo.staticPrice = Number(raw.rawPayload.price || 0);
+
+          priceInfo.halfPrice = Number(half.price || 0);
+          priceInfo.fullPrice = Number(full.price || 0);
+        } else {
+          priceInfo.staticPrice = Number(
+            raw.price || raw.rawPayload?.price || 0
+          );
         }
 
-        // addOns
-        const addOns = Array.isArray(raw.addons) && raw.addons.length > 0
+        const addOns = Array.isArray(raw.addons)
           ? raw.addons
-          : Array.isArray(raw.rawPayload?.addon) && raw.rawPayload.addon.length > 0
+          : Array.isArray(raw.rawPayload?.addon)
           ? raw.rawPayload.addon
           : [];
 
-        // cuisine/category
-        const cuisineType = raw.cuisines && raw.cuisines.length > 0 ? raw.cuisines[0] : raw.rawPayload?.cuisine || '';
+        const cuisineType =
+          raw.cuisines?.[0] || raw.rawPayload?.cuisine || "";
 
-        // Resolve attribute id/name to canonical type (veg / non-veg / egg / etc.)
-        const attrId = raw.attribute || raw.attributeId || raw.attributeid || raw.rawPayload?.attributeid || '';
-        const attrName = (attributeMap[String(attrId)] || raw.rawPayload?.attribute || raw.attributeName || '').toLowerCase();
-        let resolvedType = 'veg';
-        if (attrName) {
-          if (attrName.includes('non')) resolvedType = 'non-veg';
-          else if (attrName.includes('egg')) resolvedType = 'egg';
-          else if (attrName.includes('veg')) resolvedType = 'veg';
-          else resolvedType = attrName;
-        } else {
-          // fallback to legacy numeric check
-          resolvedType = raw.attribute === '2' || raw.attribute === 2 ? 'non-veg' : 'veg';
-        }
+        const attrId =
+          raw.attribute || raw.attributeId || raw.rawPayload?.attributeid || "";
+
+        const attrName = (attributeMap[String(attrId)] || "").toLowerCase();
+        const resolvedType = resolveFoodType({ attrId, attrName, name, raw });
 
         return {
-          // keep wrapper for components that expect `item.food`
           food: {
             _id: id,
             name,
@@ -111,11 +153,10 @@ export const fetchFoodPagination = createAsyncThunk(
             type: resolvedType,
             priceInfo,
             addOns,
-            description: raw.rawPayload?.itemdescription || raw.description || '',
+            description: raw.description || raw.rawPayload?.itemdescription || "",
             available,
-            raw: raw,
+            raw,
           },
-          // flattened top-level fields also useful elsewhere
           _id: id,
           name,
           image,
@@ -123,48 +164,41 @@ export const fetchFoodPagination = createAsyncThunk(
           type: resolvedType,
           priceInfo,
           addOns,
-          description: raw.rawPayload?.itemdescription || raw.description || '',
+          description: raw.description || "",
           available,
-          raw,
         };
       };
 
-      const pagination = response?.data?.pagination || {};
-
-      const total = Number(pagination.totalItems || 0);
-      const returnedPage = Number(pagination.page || page);
-      const returnedLimit = Number(pagination.limit || limit);
-
-      console.log("TOTAL:", total);
-      console.log("PAGE:", returnedPage);
-
       const normalized = foods.map(normalizePetpooja);
+
+      const hasMore =
+        returnedLimit > 0 &&
+        returnedPage * returnedLimit < total &&
+        normalized.length > 0;
 
       return {
         foods: normalized,
-        parentCategories,
-        groupCategories,
-        categories,
-        addOnGroups,
-        addOnItems,
-        attributes,
-        discounts,
-        taxes,
-        menu,
+        parentCategories: data.parentcategories || [],
+        groupCategories: data.groupcategories || [],
+        categories: data.categories || [],
+        addOnGroups: data.addongroups || [],
+        addOnItems: data.addonitems || [],
+        attributes: data.attributes || [],
+        discounts: data.discounts || [],
+        taxes: data.taxes || [],
+        menu: data.menu || {},
         page: returnedPage,
-        hasMore:
-          normalized.length > 0 &&
-          returnedPage * returnedLimit < total,
+        hasMore,
       };
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data || error.message
-      );
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 
-
+// ----------------------------------------------
+// SLICE
+// ----------------------------------------------
 const SearchFoodPaginationSlice = createSlice({
   name: "FoodPagination",
   initialState: {
@@ -186,17 +220,7 @@ const SearchFoodPaginationSlice = createSlice({
 
   reducers: {
     clearFoods: (state) => {
-      // 🚀 FIX 2 — Reset everything on new search/filter
       state.AllFoodsData = [];
-      state.parentCategories = [];
-      state.groupCategories = [];
-      state.categories = [];
-      state.addOnGroups = [];
-      state.addOnItems = [];
-      state.attributes = [];
-      state.discounts = [];
-      state.taxes = [];
-      state.menu = {};
       state.page = 1;
       state.hasMore = true;
       state.error = null;
@@ -213,24 +237,22 @@ const SearchFoodPaginationSlice = createSlice({
         state.loading = false;
         state.page = action.payload.page;
         state.hasMore = action.payload.hasMore;
-        state.parentCategories = action.payload.parentCategories || [];
-        state.groupCategories = action.payload.groupCategories || [];
-        state.categories = action.payload.categories || [];
-        state.addOnGroups = action.payload.addOnGroups || [];
-        state.addOnItems = action.payload.addOnItems || [];
-        state.attributes = action.payload.attributes || [];
-        state.discounts = action.payload.discounts || [];
-        state.taxes = action.payload.taxes || [];
-        state.menu = action.payload.menu || {};
 
-        // 🚀 FIX 3 — Replace list when page === 1
+        state.parentCategories = action.payload.parentCategories;
+        state.groupCategories = action.payload.groupCategories;
+        state.categories = action.payload.categories;
+
+        state.addOnGroups = action.payload.addOnGroups;
+        state.addOnItems = action.payload.addOnItems;
+        state.attributes = action.payload.attributes;
+        state.discounts = action.payload.discounts;
+        state.taxes = action.payload.taxes;
+        state.menu = action.payload.menu;
+
         if (action.payload.page === 1) {
-          state.AllFoodsData = action.payload.foods; // fresh data
+          state.AllFoodsData = action.payload.foods;
         } else {
-          state.AllFoodsData = [
-            ...state.AllFoodsData,
-            ...action.payload.foods,
-          ];
+          state.AllFoodsData.push(...action.payload.foods);
         }
       })
 
@@ -240,10 +262,6 @@ const SearchFoodPaginationSlice = createSlice({
       });
   },
 });
-
-// ----------------------------------------------
-// Exports
-// ----------------------------------------------
 
 export const { clearFoods } = SearchFoodPaginationSlice.actions;
 export default SearchFoodPaginationSlice.reducer;

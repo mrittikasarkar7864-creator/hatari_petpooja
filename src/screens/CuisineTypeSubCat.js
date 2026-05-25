@@ -24,6 +24,7 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { openCuisineModal } from "../redux/slice/ModalSlice";
 import { fetchCategories } from "../redux/slice/CategoriSlice";
 import { fetchAllSubCategories } from "../redux/slice/AllSubCategorySlice";
+import { shouldIncludeByVegFilter } from "../utils/foodType";
 
 const { width, height } = Dimensions.get("window");
 
@@ -71,11 +72,7 @@ const CuisineTypeSubCat = ({ navigation }) => {
     .filter(Boolean);
 
   const filteredCategories = categoriesData.filter((item) => {
-    if (!item?.type) return !isVeg;
-    const types = Array.isArray(item.type)
-      ? item.type.map((t) => t.toLowerCase())
-      : [String(item.type).toLowerCase()];
-    return isVeg ? types.includes("veg") : !types.includes("veg");
+    return shouldIncludeByVegFilter(item, isVeg);
   });
 
   // 🔹 Fetch categories on mount
@@ -91,10 +88,11 @@ const CuisineTypeSubCat = ({ navigation }) => {
       );
     }
     if (cuisineType?._id) {
+      const apiType = isVeg === null ? "" : isVeg ? "veg" : "non-veg";
       dispatch(
         fetchAllCategories({
           mainCategory: cuisineType._id,
-          type: isVeg ? "veg" : "non-veg",
+          type: apiType,
         })
       );
     }
@@ -125,7 +123,7 @@ const CuisineTypeSubCat = ({ navigation }) => {
     await dispatch(
       fetchAllCategories({
         mainCategory: parentId,
-        type: isVeg ? "veg" : "non-veg",
+        type: isVeg === null ? "" : isVeg ? "veg" : "non-veg",
       })
     );
     setExpandedParent(parentId);
@@ -148,7 +146,7 @@ const CuisineTypeSubCat = ({ navigation }) => {
         const response = await dispatch(
           fetchAllSubCategories({
             subCategoryId: item._id, // clicked category id
-            type: isVeg ? "veg" : "non-veg",
+            type: isVeg === null ? "" : isVeg ? "veg" : "non-veg",
           })
         );
 

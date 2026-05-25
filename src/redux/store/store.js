@@ -41,6 +41,7 @@ import CategoriSliceReducer from '../slice/CategoriSlice';
 import modalReducer from '../slice/ModalSlice'
 import allSubCategoryReducer from '../slice/AllSubCategorySlice'
 import CartPetpoojaReducer from '../slice/CartPetpoojaSlice'
+import CartApiReducer from '../slice/CartApiSlice'
 
 const cartPersistConfig = {
   key: 'cart',
@@ -82,6 +83,7 @@ const store = configureStore({
     modal:modalReducer,
    allSubCategory: allSubCategoryReducer,
     cartPetpooja: CartPetpoojaReducer,
+    cartApi : CartApiReducer
   },
     middleware: getDefaultMiddleware =>
       getDefaultMiddleware({

@@ -207,9 +207,19 @@ const HomeHeader = () => {
             {/* Search */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() =>
-                navigation.navigate('Bottom', { screen: 'MenuScreen' })
-              }
+              onPress={() => {
+                if (typeof navigation?.jumpTo === 'function') {
+                  navigation.jumpTo('MenuScreen');
+                  return;
+                }
+
+                const parentNav = navigation.getParent?.();
+                if (typeof parentNav?.jumpTo === 'function') {
+                  parentNav.jumpTo('MenuScreen');
+                } else {
+                  navigation.navigate('MenuScreen');
+                }
+              }}
               style={styles.searchInput}
             >
               <Text style={styles.placeholder}>

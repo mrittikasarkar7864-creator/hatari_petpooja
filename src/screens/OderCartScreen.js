@@ -1,5 +1,10 @@
+// ==========================================
 // src/screens/cart/CartScreen.js
-import React, {useState} from 'react';
+// PETPOOJA API BASED FULL CART SCREEN
+// ==========================================
+
+import React, {useEffect, useState} from 'react';
+
 import {
   View,
   Text,
@@ -14,175 +19,335 @@ import {
   Modal,
   SafeAreaView,
   ToastAndroid,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import ShimmerPlaceHolder from 'react-native-shimmer-placeholder';
+
 import LinearGradient from 'react-native-linear-gradient';
-import {useNavigation} from '@react-navigation/native';
-import {useSelector, useDispatch} from 'react-redux';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import Ionicons from 'react-native-vector-icons/Ionicons';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import DashboardScreen from '../components/DashboardScreen';
-import CustomHeader from '../components/CustomHeader';
+
+import ShimmerPlaceHolder from 'react-native-shimmer-placeholder';
+
 import {
-  removeFromCart,
-  updateQuantity,
-  updateNote,
-} from '../redux/slice/cartSlice';
-import {postCustomizedFood} from '../redux/slice/CustomizeSlice';
+  useNavigation,
+  useFocusEffect,
+} from '@react-navigation/native';
+
+import {useDispatch, useSelector} from 'react-redux';
+
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+
+import DashboardScreen from '../components/DashboardScreen';
+
+import CustomHeader from '../components/CustomHeader';
+
 import Theme from '../assets/theme';
+
+import {
+  updatePetpoojaCart,
+  removePetpoojaCartItem,
+  fetchPetpoojaCart,
+} from '../redux/slice/CartPetpoojaSlice';
 
 const {width, height} = Dimensions.get('window');
 
 const OderCartScreen = () => {
   const navigation = useNavigation();
+
   const dispatch = useDispatch();
-  const {items: cartItems} = useSelector(state => state.cart);
-  console.log(cartItems, '--------------------------cartItems');
-
-  const [loading, setLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-
-  const [noteText, setNoteText] = useState('');
 
   const insets = useSafeAreaInsets();
 
-  const formatCurrency = amount => `₹${amount.toLocaleString('en-IN')}`;
+  // ==========================================
+  // REDUX
+  // ==========================================
 
-  const getLinePayload = item => ({
-    id: item.id,
-    selectedOption: item.selectedOption,
-    selectedAddOns: item.selectedAddOns || [],
-  });
+  const {
+    cartData,
+    fetchingCart,
+    syncing,
+    error,
+  } = useSelector(state => state.cartPetpooja);
+  console.log(cartData, fetchingCart, syncing, error,"----------------cartData, fetchingCart, syncing, error,");
+  
 
-  const incrementQty = item => {
-    dispatch(
-      updateQuantity({
-        ...getLinePayload(item),
-        quantity: item.quantity + 1,
-      }),
-    );
-  };
-  const decrementQty = item => {
-    dispatch(
-      updateQuantity({
-        ...getLinePayload(item),
-        quantity: item.quantity > 1 ? item.quantity - 1 : 1,
-      }),
-    );
-  };
-  const deleteItem = item => {
-    dispatch(removeFromCart(getLinePayload(item)));
+  // ==========================================
+  // LOCAL STATES
+  // ==========================================
+
+  const [selectedItem, setSelectedItem] =
+    useState(null);
+
+  const [noteText, setNoteText] = useState('');
+
+  // ==========================================
+  // PETPOOJA ITEMS
+  // ==========================================
+
+  const cartItems = Array.isArray(cartData?.items)
+    ? cartData.items
+    : [];
+
+  const restaurantId =
+    cartData?.restaurantId || '52120';
+
+  // ==========================================
+  // FETCH CART
+  // ==========================================
+
+  useFocusEffect(
+    React.useCallback(() => {
+      dispatch(fetchPetpoojaCart());
+    }, [dispatch]),
+  );
+
+  // ==========================================
+  // HELPERS
+  // ==========================================
+
+  const formatCurrency = amount =>
+    `₹${Number(amount || 0).toLocaleString(
+      'en-IN',
+    )}`;
+
+  const getItemTotal = item => {
+    const base =
+      Number(
+        item?.price ||
+          item?.unitPrice ||
+          item?.amount,
+      ) || 0;
+
+    const addons =
+      item?.addons?.reduce(
+        (sum, addon) =>
+          sum + Number(addon?.price || 0),
+        0,
+      ) || 0;
+
+    return (base + addons) * Number(item.quantity);
   };
 
-  // const openModal = item => {
-  //   setSelectedItem(item);
-  //   setNoteText(item.note || '');
-  // };
+  const getItemId = item =>
+    item?.itemId || item?.itemid || item?.item_id || item?.id || item?._id;
+
+  const getVariationId = item =>
+    item?.variationId || item?.variationid || item?.variation_id || '';
+
+  // ==========================================
+  // INCREMENT
+  // ==========================================
+
+  const incrementQty = async item => {
+    try {
+      await dispatch(
+        updatePetpoojaCart({
+          restaurantId,
+
+          cartItem: {
+            ...item,
+
+            itemId: getItemId(item),
+
+            variationId: getVariationId(item),
+
+            quantity:
+              Number(item.quantity || 1) + 1,
+          },
+        }),
+      ).unwrap();
+
+      dispatch(fetchPetpoojaCart());
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // ==========================================
+  // DECREMENT
+  // ==========================================
+
+  const decrementQty = async item => {
+    try {
+      const updatedQty =
+        Number(item.quantity || 1) > 1
+          ? Number(item.quantity) - 1
+          : 1;
+
+      if (Number(item.quantity || 1) <= 1) {
+        await dispatch(
+          removePetpoojaCartItem({
+            itemId: getItemId(item),
+            variationId: getVariationId(item),
+          }),
+        ).unwrap();
+
+        dispatch(fetchPetpoojaCart());
+        return;
+      }
+
+      await dispatch(
+        updatePetpoojaCart({
+          restaurantId,
+
+          cartItem: {
+            ...item,
+
+            itemId: getItemId(item),
+
+            variationId: getVariationId(item),
+
+            quantity: updatedQty,
+          },
+        }),
+      ).unwrap();
+
+      dispatch(fetchPetpoojaCart());
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // ==========================================
+  // DELETE ITEM
+  // ==========================================
+
+  const deleteItem = async item => {
+    try {
+      await dispatch(
+        removePetpoojaCartItem({
+          itemId: getItemId(item),
+          variationId: getVariationId(item),
+        }),
+      ).unwrap();
+
+      dispatch(fetchPetpoojaCart());
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          'Item removed from cart',
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // ==========================================
+  // MODAL
+  // ==========================================
 
   const openModal = item => {
     setSelectedItem(item);
-    setNoteText(item.note || '');
+
+    setNoteText(item?.note || '');
   };
+
   const closeModal = () => {
     setSelectedItem(null);
+
     setNoteText('');
   };
 
-  const handleSaveNote = async () => {
-    if (!selectedItem) return;
-
-    try {
-      dispatch(
-        updateNote({
-          ...getLinePayload(selectedItem),
-          note: noteText,
-        }),
+  const handleSaveNote = () => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(
+        'Customization saved!',
+        ToastAndroid.SHORT,
       );
-
-      const resultAction = await dispatch(
-        postCustomizedFood({
-          food: selectedItem.id,
-          quantity: selectedItem.quantity,
-          note: noteText,
-        }),
+    } else {
+      Alert.alert(
+        'Success',
+        'Customization saved!',
       );
-
-      if (postCustomizedFood.fulfilled.match(resultAction)) {
-        // ✅ Success message
-        if (Platform.OS === 'android') {
-          ToastAndroid.show('Customization saved!', ToastAndroid.SHORT);
-        } else {
-          Alert.alert('Success', 'Customization saved!');
-        }
-      } else {
-        // ❌ Error message
-        if (Platform.OS === 'android') {
-          ToastAndroid.show('Failed to save customization', ToastAndroid.SHORT);
-        } else {
-          Alert.alert('Error', 'Failed to save customization');
-        }
-      }
-    } catch (error) {
-      console.error('Error saving note:', error);
-      if (Platform.OS === 'android') {
-        ToastAndroid.show('Something went wrong!', ToastAndroid.SHORT);
-      } else {
-        Alert.alert('Error', 'Something went wrong!');
-      }
-    } finally {
-      closeModal(); // ✅ Always close modal
     }
+
+    closeModal();
   };
+
+  // ==========================================
+  // CHECKOUT
+  // ==========================================
+
+  const handleCheckout = () => {
+    navigation.navigate(
+      'OrderSummaryScreen',
+      {
+        petpoojaCartData: cartData,
+      },
+    );
+  };
+
+  // ==========================================
+  // RENDER ITEM
+  // ==========================================
+
   const renderItem = ({item}) => {
-    console.log(item, '------------------- order111');
-    const isVeg = item.type?.toLowerCase() === 'veg';
-    const isNonVeg =
-      item.type?.toLowerCase() === 'non-veg' ||
-      item.type?.toLowerCase() === 'chicken';
+    const isVeg =
+      item?.type?.toLowerCase() === 'veg';
 
-    // Veg: green, Non-Veg: red
     const typeColor = isVeg ? 'green' : 'red';
-
-    const getItemTotal = item => {
-      const base = Number(item.unitPrice) || 0;
-      const addons =
-        item?.selectedAddOns?.reduce((sum, a) => sum + Number(a.price), 0) || 0;
-
-      return (base + addons) * item.quantity;
-    };
 
     return (
       <View style={styles.itemCard}>
-        <Image source={{uri: item.image}} style={styles.itemImage} />
+        <Image
+          source={{
+            uri:
+              item?.image ||
+              item?.imageUrl ||
+              'https://cdn-icons-png.flaticon.com/512/1046/1046784.png',
+          }}
+          style={styles.itemImage}
+        />
 
         <View style={styles.detailsContainer}>
           <View style={styles.itemHeader}>
-            <View style={[styles.typeIndicator, {borderColor: typeColor}]}>
-              <View style={[styles.typeDot, {backgroundColor: typeColor}]} />
+            <View
+              style={[
+                styles.typeIndicator,
+                {
+                  borderColor: typeColor,
+                },
+              ]}>
+              <View
+                style={[
+                  styles.typeDot,
+                  {
+                    backgroundColor: typeColor,
+                  },
+                ]}
+              />
             </View>
 
-            <Text style={styles.itemName} numberOfLines={1}>
-              {item.name}
+            <Text
+              style={styles.itemName}
+              numberOfLines={1}>
+              {item?.name || 'Food Item'}
             </Text>
           </View>
 
-          {/* PRICE DISPLAY */}
-          {/* PRICE DISPLAY */}
           <Text style={styles.itemPrice}>
-            <Text style={styles.itemPrice}>
-              {formatCurrency(getItemTotal(item))}
-            </Text>
-            {item.selectedOption === 'half'
-              ? '(Half)'
-              : item.selectedOption === 'full'
-              ? '(Full)'
-              : ''}
+            {formatCurrency(
+              getItemTotal(item),
+            )}
           </Text>
 
-          <Text style={{color: '#555', fontSize: 13}}>
-            {item?.selectedAddOns?.map(a => `${a.name} ₹${a.price}`).join(', ')}
-          </Text>
+          {/* ADDONS */}
+
+          {item?.addons?.length > 0 && (
+            <Text style={styles.addonText}>
+              {item?.addons
+                ?.map(
+                  addon =>
+                    `${addon?.name} ₹${addon?.price}`,
+                )
+                .join(', ')}
+            </Text>
+          )}
+
+          {/* ACTIONS */}
 
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -193,193 +358,322 @@ const OderCartScreen = () => {
                 size={16}
                 color={Theme.colors.red}
               />
-              <Text style={styles.customizeText}>Customize</Text>
+
+              <Text style={styles.customizeText}>
+                Customize
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.deleteBtn}
               onPress={() => deleteItem(item)}>
-              <Ionicons name="trash-outline" size={18} color="red" />
-              <Text style={styles.deleteText}>Remove</Text>
+              <Ionicons
+                name="trash-outline"
+                size={18}
+                color="red"
+              />
+
+              <Text style={styles.deleteText}>
+                Remove
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {item.note ? (
+          {/* NOTE */}
+
+          {item?.note ? (
             <View style={styles.noteTag}>
-              <Text style={styles.noteText}>📝 {item?.note}</Text>
+              <Text style={styles.noteText}>
+                📝 {item.note}
+              </Text>
             </View>
           ) : null}
         </View>
 
-        {/* Quantity Control */}
+        {/* QUANTITY */}
+
         <View style={styles.quantityBox}>
           <TouchableOpacity
             style={styles.qtyBtn}
-            onPress={() => decrementQty(item)}>
-            <Text style={styles.qtyText}>-</Text>
+            onPress={() =>
+              decrementQty(item)
+            }>
+            <Text style={styles.qtyText}>
+              -
+            </Text>
           </TouchableOpacity>
 
-          <Text style={styles.qtyValue}>{item.quantity}</Text>
+          <Text style={styles.qtyValue}>
+            {item?.quantity || 1}
+          </Text>
 
           <TouchableOpacity
             style={styles.qtyBtn}
-            onPress={() => incrementQty(item)}>
-            <Text style={styles.qtyText}>+</Text>
+            onPress={() =>
+              incrementQty(item)
+            }>
+            <Text style={styles.qtyText}>
+              +
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   };
 
+  // ==========================================
+  // UI
+  // ==========================================
+
   return (
     <>
       <CustomHeader title="My Cart" />
+
       <DashboardScreen scrollable={false}>
         <SafeAreaView style={{flex: 1}}>
           <KeyboardAvoidingView
             style={{flex: 1}}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            behavior={
+              Platform.OS === 'ios'
+                ? 'padding'
+                : undefined
+            }>
+            {/* ADD MORE */}
+
             <TouchableOpacity
               style={styles.addMore}
               onPress={() =>
-                navigation.navigate('Bottom', {screen: 'HomeScreen'})
+                navigation.navigate(
+                  'Bottom',
+                  {
+                    screen:
+                      'HomeScreen',
+                  },
+                )
               }>
-              <Text style={{color: Theme.colors.red, fontWeight: '600'}}>
+              <Text
+                style={{
+                  color:
+                    Theme.colors.red,
+                  fontWeight: '700',
+                }}>
                 + Add more Items
               </Text>
             </TouchableOpacity>
 
-            <View style={styles.container}>
-              {loading ? (
-                Array.from({length: 3}).map((_, i) => (
-                  <View key={i} style={{marginVertical: 8}}>
+       
+
+            {/* LOADER */}
+
+            {fetchingCart ? (
+              <View
+                style={{
+                  marginTop: 20,
+                }}>
+                {Array.from({
+                  length: 3,
+                }).map((_, i) => (
+                  <View
+                    key={i}
+                    style={{
+                      marginVertical: 8,
+                    }}>
                     <ShimmerPlaceHolder
-                      LinearGradient={LinearGradient}
-                      style={{width: width * 0.9, height: 80, borderRadius: 8}}
+                      LinearGradient={
+                        LinearGradient
+                      }
+                      style={{
+                        width:
+                          width * 0.9,
+                        height: 90,
+                        borderRadius: 12,
+                        alignSelf:
+                          'center',
+                      }}
                     />
                   </View>
-                ))
-              ) : cartItems.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Image
-                    source={{
-                      uri: 'https://cdn-icons-png.flaticon.com/512/2038/2038854.png',
-                    }}
-                    style={{
-                      width: width * 0.35,
-                      height: width * 0.35,
-                      marginBottom: 10,
-                    }}
-                  />
-                  <Text style={styles.emptyText}>Your cart is empty</Text>
+                ))}
+              </View>
+            ) : cartItems.length === 0 ? (
+              // EMPTY
+              <View
+                style={
+                  styles.emptyContainer
+                }>
+                <Image
+                  source={{
+                    uri:
+                      'https://cdn-icons-png.flaticon.com/512/2038/2038854.png',
+                  }}
+                  style={{
+                    width:
+                      width * 0.35,
+                    height:
+                      width * 0.35,
+                  }}
+                />
+
+                <Text
+                  style={
+                    styles.emptyText
+                  }>
+                  Your cart is empty
+                </Text>
+              </View>
+            ) : (
+              <>
+                {/* LIST */}
+
+                <FlatList
+                  data={cartItems}
+                  keyExtractor={(
+                    item,
+                    index,
+                  ) =>
+                    `${
+                      item?.itemId ||
+                      item?.id
+                    }-${index}`
+                  }
+                  renderItem={
+                    renderItem
+                  }
+                  showsVerticalScrollIndicator={
+                    false
+                  }
+                  contentContainerStyle={{
+                    paddingBottom:
+                      height * 0.18,
+                  }}
+                />
+
+                {/* BOTTOM BAR */}
+
+                <View
+                  style={[
+                    styles.bottomBar,
+                    {
+                      paddingBottom:
+                        insets.bottom ||
+                        10,
+                    },
+                  ]}>
+                  <View>
+                    <Text
+                      style={{
+                        fontWeight:
+                          '700',
+                        color:
+                          '#28a745',
+                      }}>
+                      {
+                        cartItems.length
+                      }{' '}
+                      Item(s)
+                    </Text>
+                  </View>
+
                   <TouchableOpacity
-                    style={styles.browseBtn}
-                    onPress={() =>
-                      navigation.navigate('Bottom', {screen: 'HomeScreen'})
+                    style={
+                      styles.checkoutBtn
+                    }
+                    onPress={
+                      handleCheckout
                     }>
-                    <Text style={styles.browseText}>Browse Menu</Text>
+                    <Text
+                      style={
+                        styles.checkoutText
+                      }>
+                      {syncing
+                        ? 'Syncing...'
+                        : 'Continue'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
-                <>
-                  <FlatList
-                    data={cartItems}
-                    keyExtractor={(item, index) =>
-                      `${item.id || 'unknown'}-${item.selectedOption || 'full'}-${
-                        (item.selectedAddOns || []).map(a => a.name).join('|') || 'no-addons'
-                      }-${index}`
-                    }
-                    renderItem={renderItem}
-                    contentContainerStyle={{paddingBottom: height * 0.15}}
-                    showsVerticalScrollIndicator={false}
-                  />
-
-                  {/* ✅ Fixed Responsive Bottom Bar */}
-                  <View
-                    style={[
-                      styles.bottomBar,
-                      {paddingBottom: insets.bottom || 10},
-                    ]}>
-                    <View
-                      style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                {cartItems?.length === 0 ? (
-
-  <Text
-    style={{
-      fontSize: width * 0.035,
-      color: '#999',
-      textAlign: 'center',
-      marginTop: 20,
-    }}>
-    🛒 Your cart is empty. Start adding tasty food!
-  </Text>
-
-) : (
-
-  <Text
-    style={{
-      fontSize: width * 0.035,
-      color: '#28a745',
-      textAlign: 'center',
-      marginTop: 10,
-      fontWeight: '600',
-    }}>
-    🎉 Great! You have {cartItems.length} item(s) in your cart
-  </Text>
-
-)}
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.checkoutBtn}
-                      onPress={() =>
-                        navigation.navigate('OrderSummaryScreen', {cartItems})
-                      }>
-                      <Text style={styles.checkoutText}>Continue</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
+              </>
+            )}
           </KeyboardAvoidingView>
         </SafeAreaView>
 
-        {/* Note Modal */}
+        {/* MODAL */}
+
         <Modal
           visible={!!selectedItem}
           animationType="slide"
           transparent
           onRequestClose={closeModal}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>
-                Edit Item: {selectedItem?.name}
+          <View
+            style={
+              styles.modalOverlay
+            }>
+            <View
+              style={
+                styles.modalContainer
+              }>
+              <Text
+                style={
+                  styles.modalTitle
+                }>
+                Edit Item:{' '}
+                {
+                  selectedItem?.name
+                }
               </Text>
+
               <TextInput
-                style={styles.modalInput}
-                placeholder="Enter special note..."
+                style={
+                  styles.modalInput
+                }
+                placeholder="Enter note..."
                 placeholderTextColor="#999"
                 value={noteText}
-                onChangeText={setNoteText}
+                onChangeText={
+                  setNoteText
+                }
                 multiline
               />
 
-              <View style={styles.modalActions}>
+              <View
+                style={
+                  styles.modalActions
+                }>
                 <TouchableOpacity
-                  style={[styles.modalBtn, {backgroundColor: '#ccc'}]}
-                  onPress={closeModal}>
-                  <Text style={[styles.modalBtnText, {color: '#333'}]}>
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor:
+                        '#ccc',
+                    },
+                  ]}
+                  onPress={
+                    closeModal
+                  }>
+                  <Text
+                    style={{
+                      color:
+                        '#333',
+                    }}>
                     Cancel
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
-                  style={[styles.modalBtn, {backgroundColor: Theme.colors.red}]}
-                  onPress={handleSaveNote}>
-                  <Text style={styles.modalBtnText}>Save</Text>
+                  style={[
+                    styles.modalBtn,
+                    {
+                      backgroundColor:
+                        Theme.colors.red,
+                    },
+                  ]}
+                  onPress={
+                    handleSaveNote
+                  }>
+                  <Text
+                    style={
+                      styles.modalBtnText
+                    }>
+                    Save
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -392,191 +686,254 @@ const OderCartScreen = () => {
 
 export default OderCartScreen;
 
+// ==========================================
+// STYLES
+// ==========================================
+
 const styles = StyleSheet.create({
-  addMore: {alignSelf: 'flex-end', marginVertical: 10, marginRight: 15},
-  container: {flex: 1},
-  emptyContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
-  emptyText: {fontSize: width * 0.045, color: '#555', fontWeight: '600'},
-  browseBtn: {
-    backgroundColor: Theme.colors.red,
-    marginTop: 15,
-    paddingHorizontal: width * 0.06,
-    paddingVertical: 10,
-    borderRadius: 25,
+  addMore: {
+    alignSelf: 'flex-end',
+    marginVertical: 10,
+    marginRight: 15,
   },
-  browseText: {color: '#fff', fontWeight: '600'},
+
+  syncInfoCard: {
+    backgroundColor: '#fff7ef',
+    marginHorizontal: 12,
+    marginBottom: 10,
+    padding: 12,
+    borderRadius: 12,
+  },
+
+  syncInfoTitle: {
+    color: '#d9480f',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+
+  syncInfoSub: {
+    marginTop: 4,
+    color: '#555',
+  },
+
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  emptyText: {
+    marginTop: 10,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#555',
+  },
+
   itemCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    backgroundColor: '#fff',
     marginHorizontal: 12,
     marginVertical: 6,
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
     elevation: 3,
   },
-  itemImage: {width: width * 0.18, height: width * 0.18, borderRadius: 10},
-  detailsContainer: {flex: 1, marginLeft: 12},
-  itemHeader: {flexDirection: 'row', alignItems: 'center', marginBottom: 6},
+
+  itemImage: {
+    width: width * 0.18,
+    height: width * 0.18,
+    borderRadius: 10,
+  },
+
+  detailsContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
   typeIndicator: {
     width: 16,
     height: 16,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 6,
     borderRadius: 3,
   },
-  typeDot: {width: 8, height: 8, borderRadius: 4},
+
+  typeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+
   itemName: {
-    fontSize: width * 0.04,
+    marginLeft: 8,
+    fontSize: 15,
     fontWeight: '700',
     color: '#333',
-    flexShrink: 1,
-    left: 4,
+    flex: 1,
   },
-  itemPrice: {fontSize: width * 0.037, color: '#777', marginTop: 2},
-  ratingWrapper: {
-    backgroundColor: 'green',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+
+  itemPrice: {
     marginTop: 4,
+    color: '#777',
+    fontWeight: '700',
   },
-  ratingText: {color: '#fff', fontSize: width * 0.03, fontWeight: '600'},
-  noteTag: {
-    marginTop: 6,
-    backgroundColor: '#FFF6E5',
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF9800',
-    padding: 6,
-    borderRadius: 6,
-    width: width * 0.55,
+
+  addonText: {
+    marginTop: 4,
+    color: '#555',
+    fontSize: 13,
   },
-  noteText: {fontSize: width * 0.035, color: '#444'},
-  actionRow: {flexDirection: 'row', alignItems: 'center', marginTop: 8},
+
+  actionRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+
   customizeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF1F1',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 20,
     marginRight: 10,
   },
+
   customizeText: {
-    fontSize: width * 0.032,
+    marginLeft: 5,
     color: Theme.colors.red,
     fontWeight: '600',
-    marginLeft: 5,
   },
+
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF1F1',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 20,
   },
+
   deleteText: {
-    fontSize: width * 0.032,
+    marginLeft: 5,
     color: 'red',
     fontWeight: '600',
-    marginLeft: 5,
   },
+
+  noteTag: {
+    marginTop: 6,
+    backgroundColor: '#FFF6E5',
+    padding: 6,
+    borderRadius: 6,
+  },
+
+  noteText: {
+    color: '#444',
+  },
+
   quantityBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9F9F9',
-    borderRadius: 20,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    marginLeft: 8,
   },
+
   qtyBtn: {
     width: 28,
     height: 28,
     backgroundColor: '#fff',
-    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 14,
     elevation: 2,
   },
+
   qtyText: {
-    fontSize: width * 0.05,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: Theme.colors.red,
   },
+
   qtyValue: {
-    fontSize: width * 0.035,
-    fontWeight: '600',
-    marginHorizontal: 8,
+    marginHorizontal: 10,
+    fontWeight: '700',
     color: '#000',
   },
+
   bottomBar: {
     position: 'absolute',
-    bottom: '3%',
     left: 0,
     right: 0,
+    bottom: '3%',
+    backgroundColor: '#fff',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderColor: '#eee',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    elevation: 12,
+    elevation: 10,
   },
+
   checkoutBtn: {
     backgroundColor: Theme.colors.red,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 25,
   },
-  checkoutText: {color: '#fff', fontWeight: '600', fontSize: width * 0.038},
+
+  checkoutText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor:
+      'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   modalContainer: {
     width: '85%',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
-    elevation: 6,
   },
+
   modalTitle: {
-    fontSize: width * 0.045,
+    fontSize: 18,
     fontWeight: '700',
     marginBottom: 12,
-    color: '#000',
   },
+
   modalInput: {
     backgroundColor: '#f8f8f8',
     borderRadius: 8,
     padding: 10,
-    minHeight: 60,
-    textAlignVertical: 'top',
-    fontSize: 14,
+    minHeight: 70,
     color: '#000',
   },
+
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: 15,
   },
+
   modalBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 6,
     marginLeft: 10,
   },
-  modalBtnText: {color: '#fff', fontWeight: '600'},
+
+  modalBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 });

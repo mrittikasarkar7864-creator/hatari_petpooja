@@ -2,10 +2,22 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const foodFilterSlice = createSlice({
   name: 'foodFilter',
-  initialState: { isVeg: false }, // false = non-veg, true = veg
+  initialState: { isVeg: null }, // null = all, false = non-veg, true = veg
   reducers: {
-    toggleFilter: (state) => { state.isVeg = !state.isVeg; },
-    setFilter: (state, action) => { state.isVeg = !!action.payload; },
+    toggleFilter: (state) => {
+      if (state.isVeg === null) {
+        state.isVeg = true;
+      } else {
+        state.isVeg = !state.isVeg;
+      }
+    },
+    setFilter: (state, action) => {
+      if (action.payload === null || action.payload === undefined) {
+        state.isVeg = null;
+      } else {
+        state.isVeg = !!action.payload;
+      }
+    },
   },
 });
 

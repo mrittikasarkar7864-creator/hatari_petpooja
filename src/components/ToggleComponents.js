@@ -7,15 +7,16 @@ import { toggleFilter } from '../redux/slice/toggleSlice';
 const VegNonVegToggle = () => {
   const dispatch = useDispatch();
   const isVeg = useSelector(state => state.foodFilter.isVeg);
-  const anim = useRef(new Animated.Value(isVeg ? 0 : 1)).current;
+  const resolvedIsVeg = isVeg === null ? true : isVeg;
+  const anim = useRef(new Animated.Value(resolvedIsVeg ? 0 : 1)).current;
 
   useEffect(() => {
     Animated.timing(anim, {
-      toValue: isVeg ? 0 : 1,
+      toValue: resolvedIsVeg ? 0 : 1,
       duration: 250,
       useNativeDriver: false,
     }).start();
-  }, [isVeg]);
+  }, [resolvedIsVeg]);
 
   const translateX = anim.interpolate({
     inputRange: [0, 1],
@@ -29,7 +30,7 @@ const VegNonVegToggle = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.label, { color: isVeg ? '#4CAF50' : '#999' }]}>Veg</Text>
+      <Text style={[styles.label, { color: resolvedIsVeg ? '#4CAF50' : '#999' }]}>Veg</Text>
 
       <TouchableOpacity onPress={() => dispatch(toggleFilter())} activeOpacity={0.8}>
         <Animated.View style={[styles.toggle, { backgroundColor: bgColor }]}>
@@ -39,7 +40,7 @@ const VegNonVegToggle = () => {
         </Animated.View>
       </TouchableOpacity>
 
-      <Text style={[styles.label, { color: !isVeg ? '#E53935' : '#999' }]}>Non-Veg</Text>
+      <Text style={[styles.label, { color: !resolvedIsVeg ? '#E53935' : '#999' }]}>Non-Veg</Text>
     </View>
   );
 };

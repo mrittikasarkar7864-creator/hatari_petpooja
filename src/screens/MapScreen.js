@@ -11,9 +11,10 @@ import {
   Alert,
   StatusBar,
   Dimensions,
+  Linking,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import Geolocation from "@react-native-community/geolocation";
+import Geolocation from "react-native-geolocation-service";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import CustomSearchInput from "../components/CustomSearchInput";
 import SaveAddressModal from "../components/SaveAddressModal";
@@ -23,13 +24,20 @@ import { GOOGLE_API_KEY } from "../global_Url/googlemapkey";
 import { useFocusEffect } from "@react-navigation/native";
 
 const { width, height } = Dimensions.get("window");
+const DEFAULT_REGION = {
+  latitude: 28.6139,
+  longitude: 77.209,
+  latitudeDelta: 0.01,
+  longitudeDelta: 0.01,
+};
 
 const MapScreen = ({ navigation }) => {
   const mapRef = useRef(null);
+  const geocodeDeniedShownRef = useRef(false);
 
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState(null);
-  const [mapRegion, setMapRegion] = useState(null);
+  const [mapRegion, setMapRegion] = useState(DEFAULT_REGION);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [selectedType, setSelectedType] = useState("Home");
   const [addressDetails, setAddressDetails] = useState({
@@ -103,16 +111,45 @@ const MapScreen = ({ navigation }) => {
         console.warn(err);
       }
     } else {
-      fetchCurrentLocation();
+      try {
+        const auth = await Geolocation.requestAuthorization("whenInUse");
+
+        if (auth === "granted") {
+          fetchCurrentLocation();
+          return;
+        }
+
+        setLoading(false);
+        Alert.alert(
+          "Permission Required",
+          "Please allow location access to fetch your current location.",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Open Settings",
+              onPress: () => Linking.openSettings(),
+            },
+          ]
+        );
+      } catch (err) {
+        setLoading(false);
+        Alert.alert("Error", "Unable to request location permission.");
+      }
     }
   };
 
   const fetchCurrentLocation = () => {
     setLoading(true);
+    
     Geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        const region = { latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+        const region = { 
+          latitude, 
+          longitude, 
+          latitudeDelta: 0.01, 
+          longitudeDelta: 0.01 
+        };
 
         setLocation({ latitude, longitude });
         setMapRegion(region);
@@ -122,16 +159,38 @@ const MapScreen = ({ navigation }) => {
         setLoading(false);
       },
       (error) => {
-        console.log("❌ GPS Error:", error);
         setLoading(false);
-        Alert.alert(
-          "Error",
-          "Unable to fetch current location. Make sure GPS is ON and permission granted."
-        );
+        const code = Number(error?.code || 0);
+        
+        // Fallback: Use default location (Delhi) if GPS fails
+        if (code === 3 || code === 2) {
+          const fallbackLocation = { latitude: 28.7041, longitude: 77.1025, description: "Delhi" };
+          setLocation(fallbackLocation);
+          setMapRegion({ ...fallbackLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 });
+          mapRef.current?.animateToRegion({ ...fallbackLocation, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 1000);
+          Alert.alert("Using Default Location", "Using Delhi as default. Please search for your location or enable location services.");
+        } else if (code === 1) {
+          Alert.alert(
+            "Permission Denied",
+            "Location permission is denied. Enable it from Settings.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Open Settings",
+                onPress: () => Linking.openSettings(),
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            "Error",
+            "Unable to fetch current location. Make sure GPS is ON and permission granted. Or search for your location manually."
+          );
+        }
       },
       {
-        enableHighAccuracy: false,
-        timeout: 20000,
+        enableHighAccuracy: true,
+        timeout: 30000,
         maximumAge: 0,
       }
     );
@@ -158,13 +217,66 @@ const MapScreen = ({ navigation }) => {
 
         setLocation((prev) => ({ ...prev, description: result.formatted_address }));
         setAddressDetails({ pin, area, city, state });
+      } else if (data.status === "REQUEST_DENIED") {
+        setLocation((prev) => ({
+          ...prev,
+          description: `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`,
+        }));
+
+        try {
+          const osmResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+            {
+              headers: {
+                Accept: "application/json",
+                "User-Agent": "HatariApp/1.0",
+              },
+            }
+          );
+          const osmData = await osmResponse.json();
+
+          if (osmData?.display_name) {
+            const address = osmData.address || {};
+            setLocation((prev) => ({
+              ...prev,
+              description: osmData.display_name,
+            }));
+            setAddressDetails({
+              pin: address.postcode || "",
+              area:
+                address.suburb ||
+                address.neighbourhood ||
+                address.city_district ||
+                "",
+              city: address.city || address.town || address.village || "",
+              state: address.state || "",
+            });
+          }
+        } catch (osmErr) {
+          if (!geocodeDeniedShownRef.current) {
+            geocodeDeniedShownRef.current = true;
+            Alert.alert(
+              "Maps API Billing Required",
+              "Google Geocoding is denied because billing is not enabled for this API key."
+            );
+          }
+        }
+      } else {
+        setLocation((prev) => ({
+          ...prev,
+          description: `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`,
+        }));
       }
     } catch (err) {
-      console.log("❌ Reverse geocode error:", err);
+      console.log("Reverse geocode error:", err);
+      setLocation((prev) => ({
+        ...prev,
+        description: `Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`,
+      }));
     }
   };
 
-  const goToCurrentLocation = () => fetchCurrentLocation();
+  const goToCurrentLocation = () => requestLocationPermission();
 
   /** ================= UI ================= **/
 
@@ -186,30 +298,34 @@ const MapScreen = ({ navigation }) => {
               region={mapRegion}
               showsUserLocation
               showsMyLocationButton
+              scrollEnabled={true}
+              zoomEnabled={true}
             >
               {location && (
                 <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} />
               )}
             </MapView>
 
-            {/* Custom Search Input */}
-            <CustomSearchInput
-              onPlaceSelect={async (place) => {
-                const loc = { latitude: place.latitude, longitude: place.longitude, description: place.description };
-                setLocation(loc);
-                const region = { ...loc, latitudeDelta: 0.01, longitudeDelta: 0.01 };
-                setMapRegion(region);
-                mapRef.current?.animateToRegion(region, 1000);
-                await reverseGeocode(place.latitude, place.longitude);
-              }}
-            />
+            {/* Custom Search Input - Priority Layer */}
+            <View style={styles.searchContainer}>
+              <CustomSearchInput
+                onPlaceSelect={async (place) => {
+                  const loc = { latitude: place.latitude, longitude: place.longitude, description: place.description };
+                  setLocation(loc);
+                  const region = { ...loc, latitudeDelta: 0.01, longitudeDelta: 0.01 };
+                  setMapRegion(region);
+                  mapRef.current?.animateToRegion(region, 1000);
+                  await reverseGeocode(place.latitude, place.longitude);
+                }}
+              />
+            </View>
 
             {/* Address Info */}
             <View style={styles.addressSection}>
               <Text style={styles.sectionTitle}>🏠 {selectedType}</Text>
               <Text style={styles.subAddress}>{location?.description || "No address selected"}</Text>
               <TouchableOpacity onPress={goToCurrentLocation} style={styles.useCurrentBtn}>
-                <Text style={styles.useCurrentText}>Use Current Location</Text>
+                <Text style={styles.useCurrentText}>📍 Use Current Location</Text>
               </TouchableOpacity>
             </View>
 
@@ -246,7 +362,15 @@ const styles = StyleSheet.create({
   fullScreenContainer: { flex: 1 },
   loader: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 10, fontSize: 14, color: "#555" },
-  map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  map: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1 },
+  searchContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    pointerEvents: "box-none",
+  },
   addressSection: {
     position: "absolute",
     top: Platform.OS === "android" ? 60 : 90,
@@ -256,6 +380,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     elevation: 5,
+    zIndex: 10,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 3 },
@@ -263,7 +388,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 4 },
   subAddress: { fontSize: 13, color: "#c71616ff" },
-  useCurrentBtn: { marginTop: 8 },
+  useCurrentBtn: { 
+    marginTop: 12, 
+    paddingVertical: 10, 
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: "#f5f5f5",
+  },
   useCurrentText: { color: Theme.colors.red, fontWeight: "700", fontSize: 13 },
   floatingNextBtn: {
     position: "absolute",
@@ -274,6 +405,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 30,
     elevation: 5,
+    zIndex: 10,
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowOffset: { width: 0, height: 3 },

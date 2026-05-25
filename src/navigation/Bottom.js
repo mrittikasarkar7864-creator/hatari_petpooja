@@ -27,6 +27,7 @@ const Bottom = () => {
             tabBarShowLabel: true,
             tabBarActiveTintColor: '#FF4D4D',
             tabBarInactiveTintColor: '#999',
+            unmountOnBlur: false,
             tabBarLabelStyle: {
               fontSize: 12,
               fontWeight: '600',

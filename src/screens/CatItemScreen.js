@@ -29,8 +29,13 @@ import {
   fetchCategoryFoods,
   clearCategoryFoods,
 } from "../redux/slice/catItemSlice";
+import { shouldIncludeByVegFilter } from "../utils/foodType";
 
 import { addToCart } from "../redux/slice/cartSlice";
+import {
+  addItemToPetpoojaCart,
+  fetchPetpoojaCart,
+} from "../redux/slice/CartApiSlice";
 import Theme from "../assets/theme";
 
 const { width } = Dimensions.get("window");
@@ -42,6 +47,9 @@ const CatItemScreen = () => {
 
   const isVeg = useSelector((state) => state.foodFilter?.isVeg);
   const cartItems = useSelector((state) => state.cart?.items || []);
+  const selectedRestaurant = useSelector(
+    state => state.experience?.selectedRestaurant,
+  );
 
   // route params
   const {
@@ -142,17 +150,10 @@ const CatItemScreen = () => {
       if (f !== String(selectedCuisineType).toLowerCase()) return false;
     }
 
-    // veg/non-veg filter robust to arrays/strings
-    const typeRaw = Array.isArray(food.type) ? food.type[0] : String(food.type || "");
-    const type = String(typeRaw).toLowerCase();
+    if (!shouldIncludeByVegFilter(food, isVeg)) {
+      return false;
+    }
 
-    if (isVeg === true) {
-      // include veg but avoid strings like 'non-veg'
-      return type.includes("veg") && !type.includes("non");
-    }
-    if (isVeg === false) {
-      return type.includes("non");
-    }
     return true;
   });
 
@@ -217,25 +218,69 @@ const [initialLoading, setInitialLoading] = useState(true);
 
   const handleConfirmAdd = () => {
     if (!selectedFood) return;
+
+    const localCartItem = {
+      ...selectedFood,
+      id:
+        selectedFood?.id ||
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?._id,
+      itemId:
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?.id ||
+        selectedFood?._id,
+      selectedOption,
+      hasVariation: !!selectedFood?.priceInfo?.hasVariation,
+      quantity,
+      totalPrice,
+    };
+
+    const resolvedRestaurantId =
+      selectedRestaurant?.restaurantId ||
+      selectedRestaurant?.petpoojaRestaurantId ||
+      restaurantId ||
+      selectedRestaurant?.id ||
+      selectedRestaurant?._id;
+
     // dispatch cart action (option + quantity stored)
     dispatch(
       addToCart({
-        ...selectedFood,
-        selectedOption,
-        hasVariation: !!selectedFood?.priceInfo?.hasVariation,
-        quantity,
-        totalPrice,
+        ...localCartItem,
       })
     );
 
-    closeModal();
-    setBottomBoxVisible(true);
-    Animated.timing(boxAnim, {
-      toValue: 0,
-      duration: 400,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    const addAndNavigate = async () => {
+      try {
+        await dispatch(
+          addItemToPetpoojaCart({
+            restaurantId: resolvedRestaurantId,
+            cartItem: localCartItem,
+          }),
+        ).unwrap();
+
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        closeModal();
+        navigation.navigate('OderCartScreen', {
+          petpoojaCartData: cartResponse?.cart || null,
+          fromPetpoojaSync: true,
+        });
+      } catch (e) {
+        closeModal();
+        setBottomBoxVisible(true);
+        Animated.timing(boxAnim, {
+          toValue: 0,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+    };
+
+    addAndNavigate();
   };
 
   const handleGoToCart = () => {

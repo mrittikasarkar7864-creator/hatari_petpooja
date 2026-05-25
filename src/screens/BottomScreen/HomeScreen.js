@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import ShimmerPlaceholder from 'react-native-shimmer-placeholder';
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
@@ -34,6 +34,11 @@ import { addToCart } from '../../redux/slice/cartSlice';
 import { fetchCategories } from '../../redux/slice/CategoriSlice';
 import { setExperience } from '../../redux/slice/experienceSlice';
 import { closeCuisineModal, openCuisineModal } from '../../redux/slice/ModalSlice';
+import { shouldIncludeByVegFilter } from '../../utils/foodType';
+import {
+  addItemToPetpoojaCart,
+  fetchPetpoojaCart,
+} from '../../redux/slice/CartApiSlice';
 
 
 const { width } = Dimensions.get('window');
@@ -41,6 +46,7 @@ const { width } = Dimensions.get('window');
 const HomeScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const isFocused = useIsFocused();
   const tabBarHeight = useBottomTabBarHeight();
 
   const isVeg = useSelector(state => state.foodFilter.isVeg);
@@ -75,6 +81,18 @@ const HomeScreen = () => {
     : menuCategories.length
     ? menuCategories
     : [];
+
+  const hour = new Date().getHours();
+  const mealMoment = hour < 12 ? 'Breakfast' : hour < 17 ? 'Lunch' : 'Dinner';
+  const categoryCount = displayCategories.length;
+  const totalMenuItems = displayCategories.reduce(
+    (sum, category) => sum + (category?.items?.length || 0),
+    0,
+  );
+  const categorySectionTitle = `${mealMoment} Picks For You`;
+  const categorySectionSubtitle = categoryCount
+    ? `${categoryCount} curated categories • ${totalMenuItems} dishes available`
+    : `Discover chef specials for ${mealMoment.toLowerCase()}`;
 
   const openMenuGroup = (group) => {
     dispatch(openCuisineModal(group));
@@ -124,6 +142,7 @@ const HomeScreen = () => {
   const bannerScrollRef = useRef();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const boxAnim = useRef(new Animated.Value(150)).current;
+  const initialDataLoadedRef = useRef(false);
 
   const foodPaginationLoading = useSelector(state => state.FoodPagination.loading);
     
@@ -141,8 +160,16 @@ const HomeScreen = () => {
     return () => clearInterval(interval);
   }, [bannerlist]);
 
-  // Fetch Initial Data and refresh when branch changes
+  // Fetch static data once when Home tab is focused
   useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+
+    if (initialDataLoadedRef.current) {
+      return;
+    }
+
     const loadData = async () => {
       try {
         setLoading(true);
@@ -152,38 +179,58 @@ const HomeScreen = () => {
           dispatch(fetchAllFoodCat()),
           dispatch(fetchCategories()),
         ]);
-
-        if (resId) {
-          await dispatch(
-            fetchFoodPagination({
-              page: 1,
-              limit: 1,
-              type: isVeg ? 'veg' : 'non-veg',
-              search: '',
-              restaurantId: resId,
-            }),
-          ).unwrap();
-        }
-
-        const res = await dispatch(
-          fetchCategoryFoods({
-            page: 1,
-            limit: 1000,
-            isTrending: true,
-            type: isVeg ? 'veg' : 'non-veg',
-            restaurantId: resId,
-          }),
-        ).unwrap();
-        console.log(res, "-------------------fetchCategoryFoods result-------------------");
-
-        setFoods(res?.data || []);
+        initialDataLoadedRef.current = true;
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [dispatch, isVeg, resId]);
+  }, [dispatch, isFocused]);
+
+  // Fetch menu/trending food when branch or veg filter changes
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+
+    const foodType = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
+
+    const loadFoodData = async () => {
+      try {
+        if (!resId) {
+          setFoods([]);
+          return;
+        }
+
+        await dispatch(
+          fetchFoodPagination({
+            page: 1,
+            limit: 1,
+            type: foodType,
+            search: '',
+            restaurantId: resId,
+          }),
+        ).unwrap();
+
+        const res = await dispatch(
+          fetchCategoryFoods({
+            page: 1,
+            limit: 1000,
+            isTrending: true,
+            type: foodType,
+            restaurantId: resId,
+          }),
+        ).unwrap();
+        console.log(res, "-------------------fetchCategoryFoods result-------------------");
+
+        setFoods(res?.data || []);
+      } catch (e) {
+      }
+    };
+
+    loadFoodData();
+  }, [dispatch, isVeg, resId, isFocused]);
 
   // Update totals
   useEffect(() => {
@@ -290,28 +337,71 @@ const HomeScreen = () => {
       0,
     );
 
+    const localCartItem = {
+      ...selectedFood,
+      id:
+        selectedFood?.id ||
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?._id,
+      itemId:
+        selectedFood?.itemid ||
+        selectedFood?.item_id ||
+        selectedFood?.itemId ||
+        selectedFood?.id ||
+        selectedFood?._id,
+      quantity,
+      selectedOption,
+      selectedAddOns,
+      totalPrice: unitPrice * quantity + addonsPrice,
+    };
+
+    const resolvedRestaurantId =
+      selectedRestaurant?.restaurantId ||
+      selectedRestaurant?.petpoojaRestaurantId ||
+      selectedRestaurant?.id ||
+      selectedRestaurant?._id;
+
     dispatch(
       addToCart({
-        ...selectedFood,
-        quantity,
-        selectedOption,
+        ...localCartItem,
         hasVariation: priceInfo.hasVariation || false,
         halfPrice: Number(priceInfo.halfPrice || 0),
         fullPrice: Number(priceInfo.fullPrice || 0),
         staticPrice: Number(priceInfo.staticPrice || 0),
-        selectedAddOns,
         unitPrice,
-        totalPrice: unitPrice * quantity + addonsPrice,
+        totalPrice: localCartItem.totalPrice,
       }),
     );
 
-    closeModal();
-    setBottomBoxVisible(true);
-    Animated.timing(boxAnim, {
-      toValue: 0,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
+    const addAndNavigate = async () => {
+      try {
+        await dispatch(
+          addItemToPetpoojaCart({
+            restaurantId: resolvedRestaurantId,
+            cartItem: localCartItem,
+          }),
+        ).unwrap();
+
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        closeModal();
+        navigation.navigate('OderCartScreen', {
+          petpoojaCartData: cartResponse?.cart || null,
+          fromPetpoojaSync: true,
+        });
+      } catch (e) {
+        closeModal();
+        setBottomBoxVisible(true);
+        Animated.timing(boxAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      }
+    };
+
+    addAndNavigate();
   };
 
   const handleGoToCart = () => {
@@ -336,20 +426,9 @@ const HomeScreen = () => {
     },
   ];
 
-  const filteredFoods = foods.filter(item => {
-    const rawType = item?.food?.type || item?.type || '';
-    const type = rawType.toLowerCase().trim();
-
-    if (isVeg === true) {
-      return type === 'veg';
-    }
-
-    if (isVeg === false) {
-      return type === 'non-veg';
-    }
-
-    return true; // fallback (if toggle state is null)
-  });
+  const filteredFoods = foods.filter(item =>
+    shouldIncludeByVegFilter(item?.food || item, isVeg),
+  );
 
   const renderHeader = () => (
     <>
@@ -434,7 +513,8 @@ const HomeScreen = () => {
       </View>
 
       {/* Categories */}
-      <SectionDivider title="What would you like to have today?" />
+      <SectionDivider title={categorySectionTitle} />
+      <Text style={styles.categorySubtitle}>{categorySectionSubtitle}</Text>
       {foodPaginationLoading && displayCategories.length === 0 ? (
         <ScrollView
           horizontal
@@ -991,6 +1071,14 @@ const styles = StyleSheet.create({
   categoryWrapper: {
     paddingLeft: 16,
     paddingBottom: 12,
+  },
+  categorySubtitle: {
+    paddingHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 10,
+    color: '#575757',
+    fontSize: 13,
+    fontWeight: '500',
   },
   menuGroupWrapper: {
     paddingLeft: 16,

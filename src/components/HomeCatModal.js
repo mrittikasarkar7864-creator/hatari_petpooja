@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllCategories } from '../redux/slice/GetAllCategorySlice';
 import { useNavigation } from '@react-navigation/native';
+import { shouldIncludeByVegFilter } from '../utils/foodType';
 
 const HomeCatModal = ({ visible, onClose, cuisineType }) => {
   const dispatch = useDispatch();
@@ -24,7 +25,9 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
   const categoriesState = useSelector(state => state.categoriesAllcat);
 
   const categoriesData =
-    categoriesState?.categories?.categories || [];
+    categoriesState?.categories?.categories ||
+    categoriesState?.categories ||
+    [];
 
   // ✅ Check if menu already contains categories
   // Example: Bakery -> Cakes, Pastry
@@ -32,6 +35,8 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
     cuisineType && Array.isArray(cuisineType.categories);
 
   const menuCategories = cuisineType?.categories || [];
+  console.log(menuCategories,"------------------menuCategories");
+  
 
   // ✅ Veg / NonVeg Filter
   const categoryFilter = item => {
@@ -39,15 +44,7 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
 
     if (item?.isActive === false) return false;
 
-    if (!item?.type) return !isVeg;
-
-    const types = Array.isArray(item.type)
-      ? item.type.map(t => String(t).toLowerCase())
-      : [String(item.type).toLowerCase()];
-
-    return isVeg
-      ? types.includes('veg')
-      : !types.includes('veg');
+    return shouldIncludeByVegFilter(item, isVeg);
   };
 
   // ✅ Final categories
@@ -62,11 +59,19 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
     // If already has categories, no API needed
     if (isMenuGroup) return;
 
-    if (cuisineType?._id) {
+    const mainCategoryId =
+      cuisineType?._id ||
+      cuisineType?.categoryId ||
+      cuisineType?.id ||
+      cuisineType?.parentCategoryId;
+
+    const apiType = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
+
+    if (mainCategoryId) {
       dispatch(
         fetchAllCategories({
-          mainCategory: cuisineType._id,
-          type: isVeg ? 'veg' : 'non-veg',
+          mainCategory: mainCategoryId,
+          type: apiType,
         }),
       );
     }
@@ -75,15 +80,39 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
   // ✅ CATEGORY CLICK
   // Bakery -> Cakes -> Navigate Screen
   const handleCategoryClick = item => {
+    console.log(item,"-------> clicked category");
+    
     if (!item) return;
 
     onClose?.();
 
     setTimeout(() => {
+      const selectedCategoryId =
+        item?._id ||
+        item?.categoryId ||
+        item?.id ||
+        item?.parentCategoryId ||
+        item?.groupId;
+
+      const selectedCategoryName =
+        item?.name ||
+        item?.categoryName ||
+        item?.title ||
+        'Category';
+
       navigation.navigate('TopPicksScreen', {
-        id: item?._id,
-        title: item?.name,
-        categoryData: item,
+        id: selectedCategoryId,
+        title: selectedCategoryName,
+        categoryName: selectedCategoryName,
+        categoryData: {
+          ...item,
+          name: selectedCategoryName,
+          image:
+            item?.image ||
+            item?.category_image_url ||
+            item?.icon ||
+            '',
+        },
         cuisineType,
       });
     }, 100);
@@ -174,7 +203,12 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
                 filteredCategories.map(
                   (item, index) => (
                     <TouchableOpacity
-                      key={index}
+                      key={
+                        item?._id ||
+                        item?.categoryId ||
+                        item?.id ||
+                        index
+                      }
                       style={styles.card}
                       activeOpacity={0.85}
                       onPress={() =>
@@ -190,7 +224,11 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
                       >
                         <Image
                           source={{
-                            uri: item.image,
+                            uri:
+                              item?.image ||
+                              item?.category_image_url ||
+                              item?.icon ||
+                              '',
                           }}
                           style={styles.foodImage}
                         />
@@ -201,10 +239,13 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
                         numberOfLines={1}
                       >
                         {getCleanFoodName(
-                          item?.name,
+                          item?.name ||
+                            item?.categoryName ||
+                            item?.title,
                         )}
                       </Text>
                     </TouchableOpacity>
+                    
                   ),
                 )}
             </View>
