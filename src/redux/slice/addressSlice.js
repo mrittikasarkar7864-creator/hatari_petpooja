@@ -10,6 +10,8 @@ export const addAddress = createAsyncThunk(
   async (addressData, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.post(API.addAddressPost, addressData);
+      console.log(response,"----------------------responseaddress");
+      
       return response.data; // Expect { message, success, newAddress }
     } catch (error) {
       return rejectWithValue(
@@ -18,6 +20,7 @@ export const addAddress = createAsyncThunk(
     }
   }
 );
+
 
 // ✅ Initial State
 const initialState = {
@@ -57,7 +60,8 @@ const addressSlice = createSlice({
         state.loading = false;
         state.success = true;
         state.data = action.payload;
-        state.savedAddress = action.payload.newAddress || null;
+        // API returns `address` not `newAddress`
+        state.savedAddress = action.payload.address || action.payload.newAddress || null;
       })
       .addCase(addAddress.rejected, (state, action) => {
         state.loading = false;

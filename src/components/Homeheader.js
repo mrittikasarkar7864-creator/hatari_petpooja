@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {
   View,
   Text,
@@ -11,217 +11,365 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
-import Geolocation from 'react-native-geolocation-service';
-import ToggleComponents from './ToggleComponents';
-import { setExperience, setRestaurant } from '../redux/slice/experienceSlice';
-import { getNearbybranches, sortBranchesByDistance } from '../utils/locationHelper';
 
-const { width } = Dimensions.get('window');
+import LinearGradient from 'react-native-linear-gradient';
+import {useNavigation} from '@react-navigation/native';
+import {useDispatch, useSelector} from 'react-redux';
+import Geolocation from 'react-native-geolocation-service';
+
+import ToggleComponents from './ToggleComponents';
+
+import {
+  setExperience,
+  setRestaurant,
+} from '../redux/slice/experienceSlice';
+
+import {
+  getNearbybranches,
+  sortBranchesByDistance,
+} from '../utils/locationHelper';
+
+const {width} = Dimensions.get('window');
+
 const DELIVERY_RADIUS_KM = 10;
 
 const HomeHeader = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
-  const { experienceId, selectedRestaurant } = useSelector(
-    state => state.experience
+  const {experienceId, selectedRestaurant} = useSelector(
+    state => state.experience,
   );
-  const restaurantList = useSelector(state => state.restaurants.list || []);
-  console.log(restaurantList,"restaurantList");
+
+  const restaurantList = useSelector(
+    state => state.restaurants?.list || [],
+  );
+
+const {
+  cartData = [],
+  fetchingCart,
+  syncing,
+  error,
+} = useSelector(state => state.cartPetpooja);
+
+// =============================
+// TOTAL CART COUNT
+// =============================
+const totalCount = useMemo(() => {
+  // cartData is object → cartData.items contains array
+  if (!cartData?.items || !Array.isArray(cartData.items)) {
+    return 0;
+  }
+
+  return cartData.items.reduce(
+    (total, item) => total + Number(item?.quantity || 0),
+    0,
+  );
+}, [cartData]);
+
+console.log('Cart Data:', cartData);
+console.log('Total Count:', totalCount);
+
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const [selectedExperience, setSelectedExperience] =
+    useState('Delivery');
+
+  const [userLocation, setUserLocation] = useState(null);
+
+  const [nearbyBranches, setNearbyBranches] = useState([]);
+
+  const [filteredRestaurants, setFilteredRestaurants] =
+    useState([]);
+
+  // =============================
+  // HELPERS
+  // =============================
 
   const getRestaurantId = restaurant =>
-    restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id;
+    restaurant?.restaurantId ||
+    restaurant?._id ||
+    restaurant?.id;
 
-  const selectedRestaurantId = getRestaurantId(selectedRestaurant);
-  console.log(selectedRestaurantId,"---------------------------------selectedRestaurantId");
-  
+  const selectedRestaurantId =
+    getRestaurantId(selectedRestaurant);
 
   const isRestaurantAvailable = restaurant =>
     restaurant?.is_open !== false &&
     restaurant?.store_status !== 0 &&
     restaurant?.isActive !== false;
 
-  const cartItems = useSelector(state => state.cart.items || []);
-  const totalCount = cartItems.length;
+  // =============================
+  // LOCATION + SORT
+  // =============================
 
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedExperience, setSelectedExperience] = useState('Delivery');
-  const [userLocation, setUserLocation] = useState(null);
-  const [nearbyBranches, setNearbyBranches] = useState([]);
-  const [filteredRestaurants, setFilteredRestaurants] = useState([]);
-
-  // Get user location and filter branches - branches within 10km are selectable
   useEffect(() => {
+    if (!restaurantList?.length) {
+      return;
+    }
+
     const getUserLocation = () => {
       Geolocation.getCurrentPosition(
         position => {
-          const { latitude, longitude } = position.coords;
-          
-          setUserLocation({ latitude, longitude });
+          const {latitude, longitude} = position.coords;
 
-          // Sort all branches by distance
-          const sortedByDistance = sortBranchesByDistance(
-            restaurantList,
-            { latitude, longitude }
-          );
+          setUserLocation({
+            latitude,
+            longitude,
+          });
 
-          // Branches in delivery area (<= 10km) are selectable
-          const withinDeliveryRange = getNearbybranches(
-            restaurantList,
-            { latitude, longitude },
-            DELIVERY_RADIUS_KM
-          );
+          // SORT ALL
+          const sortedByDistance =
+            sortBranchesByDistance(
+              restaurantList,
+              {
+                latitude,
+                longitude,
+              },
+            );
+
+          // ONLY DELIVERY RANGE
+          const withinDeliveryRange =
+            getNearbybranches(
+              restaurantList,
+              {
+                latitude,
+                longitude,
+              },
+              DELIVERY_RADIUS_KM,
+            );
 
           setNearbyBranches(withinDeliveryRange);
 
-          // Show all branches sorted by nearest first
           setFilteredRestaurants(sortedByDistance);
 
-          // Auto-select nearest in-range branch if current selection is missing/out-of-range
-          const selectedIsInRange = withinDeliveryRange.some(
-            branch => getRestaurantId(branch) === selectedRestaurantId
-          );
+          const selectedIsInRange =
+            withinDeliveryRange.some(
+              branch =>
+                getRestaurantId(branch) ===
+                selectedRestaurantId,
+            );
 
-          if (!selectedRestaurant || !selectedIsInRange) {
-            const branchToSelect = withinDeliveryRange[0] || sortedByDistance[0];
+          // AUTO SELECT
+          if (
+            !selectedRestaurant ||
+            !selectedIsInRange
+          ) {
+            const branchToSelect =
+              withinDeliveryRange[0] ||
+              sortedByDistance[0];
 
             if (branchToSelect) {
-              dispatch(setRestaurant(branchToSelect));
+              dispatch(
+                setRestaurant(branchToSelect),
+              );
+
               dispatch(
                 setExperience({
                   id: experienceId,
                   type: selectedExperience,
                   restaurant: branchToSelect,
-                })
+                }),
               );
             }
           }
         },
-        error => {
-          // Fallback: show all branches. First one is selectable.
-          const withDefault = restaurantList.length > 0
-            ? [restaurantList[0], ...restaurantList.slice(1)]
-            : [];
-          setFilteredRestaurants(withDefault);
-          setNearbyBranches(restaurantList.length > 0 ? [restaurantList[0]] : []);
 
-          if (!selectedRestaurant && withDefault.length > 0) {
-            dispatch(setRestaurant(withDefault[0]));
+        geoError => {
+          console.log(
+            'Location Error:',
+            geoError,
+          );
+
+          const fallbackRestaurants =
+            restaurantList.length > 0
+              ? [
+                  restaurantList[0],
+                  ...restaurantList.slice(1),
+                ]
+              : [];
+
+          setFilteredRestaurants(
+            fallbackRestaurants,
+          );
+
+          setNearbyBranches(
+            restaurantList.length > 0
+              ? [restaurantList[0]]
+              : [],
+          );
+
+          if (
+            !selectedRestaurant &&
+            fallbackRestaurants.length > 0
+          ) {
+            dispatch(
+              setRestaurant(
+                fallbackRestaurants[0],
+              ),
+            );
+
             dispatch(
               setExperience({
                 id: experienceId,
                 type: selectedExperience,
-                restaurant: withDefault[0],
-              })
+                restaurant:
+                  fallbackRestaurants[0],
+              }),
             );
           }
         },
+
         {
           enableHighAccuracy: true,
           timeout: 15000,
           maximumAge: 10000,
-        }
+        },
       );
     };
 
-    if (restaurantList.length > 0) {
-      getUserLocation();
-    }
+    getUserLocation();
   }, [restaurantList]);
 
+  // =============================
+  // SELECTABLE IDS
+  // =============================
+
   const selectableIds = new Set(
-    nearbyBranches.map(branch => getRestaurantId(branch))
+    nearbyBranches.map(branch =>
+      getRestaurantId(branch),
+    ),
   );
+
   const inRangeCount = nearbyBranches.length;
 
   return (
     <>
-      {/* StatusBar */}
+      {/* STATUS BAR */}
       <StatusBar
         translucent
         backgroundColor="transparent"
         barStyle="light-content"
       />
 
-      {/* SafeArea */}
-      <SafeAreaView style={{ backgroundColor: '#ef2435' }} />
+      {/* SAFE AREA */}
+      <SafeAreaView
+        style={{
+          backgroundColor: '#ef2435',
+        }}
+      />
 
-      {/* Header */}
+      {/* HEADER */}
       <View style={styles.headerWrapper}>
         <LinearGradient
           colors={['#ef2435', '#fefefe']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+          start={{x: 0, y: 0}}
+          end={{x: 0, y: 1}}
           style={[
             styles.headerBackground,
+
             Platform.OS === 'android'
-              ? { paddingTop: StatusBar.currentHeight }
+              ? {
+                  paddingTop:
+                    StatusBar.currentHeight,
+                }
               : {},
-          ]}
-        >
-          <View style={{ paddingHorizontal: 15 }}>
-            {/* Header Top */}
+          ]}>
+          <View
+            style={{
+              paddingHorizontal: 15,
+            }}>
+            {/* TOP */}
             <View style={styles.headerTop}>
-              {/* Branch Selector */}
+              {/* BRANCH */}
               <TouchableOpacity
                 style={styles.branchSelector}
-                onPress={() => setShowDropdown(!showDropdown)}
                 activeOpacity={0.8}
-              >
+                onPress={() =>
+                  setShowDropdown(
+                    !showDropdown,
+                  )
+                }>
                 <Image
                   source={require('../assets/images/location.png')}
                   style={styles.locationIcon}
                 />
-                <View style={{ maxWidth: '70%' }}>
-                  <Text style={styles.branchText} numberOfLines={1}>
-                    {selectedRestaurant?.name || 'Select Branch'}
+
+                <View
+                  style={{
+                    maxWidth: '70%',
+                  }}>
+                  <Text
+                    style={styles.branchText}
+                    numberOfLines={1}>
+                    {selectedRestaurant?.name ||
+                      'Select Branch'}
                   </Text>
                 </View>
+
                 <Image
                   source={require('../assets/images/downarrow.png')}
                   style={styles.downArrow}
                 />
               </TouchableOpacity>
 
-              {/* Cart */}
+              {/* CART */}
               <TouchableOpacity
-                onPress={() => navigation.navigate('OderCartScreen')}
-                style={styles.cartContainer}
                 activeOpacity={0.8}
-              >
+                style={styles.cartContainer}
+                onPress={() =>
+                  navigation.navigate(
+                    'OderCartScreen',
+                  )
+                }>
                 <Image
                   source={require('../assets/images/cart.png')}
                   style={styles.cartIcon}
                 />
+
                 {totalCount > 0 && (
-                  <View style={styles.cartBadge}>
-                    <Text style={styles.cartCount}>{totalCount}</Text>
+                  <View
+                    style={styles.cartBadge}>
+                    <Text
+                      style={styles.cartCount}>
+                      {totalCount}
+                    </Text>
                   </View>
                 )}
               </TouchableOpacity>
             </View>
 
-            {/* Search */}
+            {/* SEARCH */}
             <TouchableOpacity
               activeOpacity={0.8}
+              style={styles.searchInput}
               onPress={() => {
-                if (typeof navigation?.jumpTo === 'function') {
-                  navigation.jumpTo('MenuScreen');
+                if (
+                  typeof navigation?.jumpTo ===
+                  'function'
+                ) {
+                  navigation.jumpTo(
+                    'MenuScreen',
+                  );
                   return;
                 }
 
-                const parentNav = navigation.getParent?.();
-                if (typeof parentNav?.jumpTo === 'function') {
-                  parentNav.jumpTo('MenuScreen');
+                const parentNav =
+                  navigation.getParent?.();
+
+                if (
+                  typeof parentNav?.jumpTo ===
+                  'function'
+                ) {
+                  parentNav.jumpTo(
+                    'MenuScreen',
+                  );
                 } else {
-                  navigation.navigate('MenuScreen');
+                  navigation.navigate(
+                    'MenuScreen',
+                  );
                 }
-              }}
-              style={styles.searchInput}
-            >
+              }}>
               <Text style={styles.placeholder}>
                 Search dishes or restaurants…
               </Text>
@@ -230,129 +378,234 @@ const HomeHeader = () => {
         </LinearGradient>
       </View>
 
-      {/* Dropdown */}
+      {/* DROPDOWN */}
       {showDropdown && (
         <View style={styles.dropdownList}>
-          {/* Nearest Restaurant Indicator */}
-          {filteredRestaurants.length > 0 && (
-            <View style={styles.nearestInfoBox}>
-              <Text style={styles.nearestInfoText}>
-                📍 Nearest: {filteredRestaurants[0]?.name || 'Loading...'}
+          {/* TOP INFO */}
+          {filteredRestaurants.length >
+            0 && (
+            <View
+              style={styles.nearestInfoBox}>
+              <Text
+                style={
+                  styles.nearestInfoText
+                }>
+                📍 Nearest:{' '}
+                {filteredRestaurants[0]
+                  ?.name || 'Loading...'}
               </Text>
-              <Text style={styles.nearestSubText}>
+
+              <Text
+                style={
+                  styles.nearestSubText
+                }>
                 {inRangeCount > 0
                   ? `${inRangeCount} branches available within ${DELIVERY_RADIUS_KM} km`
-                  : `No branches within ${DELIVERY_RADIUS_KM} km. Showing nearest only.`}
+                  : `No branches within ${DELIVERY_RADIUS_KM} km`}
               </Text>
             </View>
           )}
 
-          <ScrollView style={{ maxHeight: 250 }}>
-            {filteredRestaurants.map((restaurant, index) => {
-              const restaurantId = getRestaurantId(restaurant);
-              const nearestRestaurantId = getRestaurantId(
-                filteredRestaurants[0]
-              );
+          {/* LIST */}
+          <ScrollView
+            style={{
+              maxHeight: 250,
+            }}
+            showsVerticalScrollIndicator={
+              false
+            }>
+            {filteredRestaurants.map(
+              (restaurant, index) => {
+                const restaurantId =
+                  getRestaurantId(
+                    restaurant,
+                  );
 
-              // Check if this is the nearest restaurant
-              const isNearest = nearestRestaurantId === restaurantId;
+                const nearestRestaurantId =
+                  getRestaurantId(
+                    filteredRestaurants[0],
+                  );
 
-              // Selectable if within 10km delivery range (or fallback first branch)
-              const isWithinRange = selectableIds.has(restaurantId);
+                const isNearest =
+                  nearestRestaurantId ===
+                  restaurantId;
 
-              // Disable if out of range or inactive
-              const isDisabled =
-                !isWithinRange || !isRestaurantAvailable(restaurant);
+                const isWithinRange =
+                  selectableIds.has(
+                    restaurantId,
+                  );
 
-              return (
-                <TouchableOpacity
-                  key={restaurantId || index}
-                  style={[
-                    styles.dropdownItem,
-                    isNearest && styles.nearestHighlight,
-                    isDisabled && styles.disabledItem,
-                  ]}
-                  onPress={() => {
-                    // Allow selection only for branches in delivery range
-                    if (!isDisabled) {
-                      setShowDropdown(false);
-                      dispatch(setRestaurant(restaurant));
-                      dispatch(
-                        setExperience({
-                          id: experienceId,
-                          type: selectedExperience,
-                          restaurant,
-                        })
-                      );
+                const isDisabled =
+                  !isWithinRange ||
+                  !isRestaurantAvailable(
+                    restaurant,
+                  );
+
+                return (
+                  <TouchableOpacity
+                    key={
+                      restaurantId || index
                     }
-                  }}
-                  disabled={isDisabled}
-                  activeOpacity={!isDisabled ? 0.7 : 1}
-                >
-                  <View style={styles.restaurantRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.dropdownText,
-                          selectedRestaurantId === restaurantId && {
-                            color: '#e91e3c',
-                            fontWeight: 'bold',
-                          },
-                          isDisabled && styles.disabledText,
-                          restaurant.isActive === false && { color: 'red' },
-                        ]}
-                      >
-                        {restaurant.name || 'Restaurant'}
-                      </Text>
-                      {restaurant.isActive === false && (
-                        <Text style={styles.inactiveText}>Currently unavailable</Text>
-                      )}
-                      {typeof restaurant.distance === 'number' && (
-                        <Text 
+                    activeOpacity={
+                      !isDisabled
+                        ? 0.7
+                        : 1
+                    }
+                    disabled={isDisabled}
+                    style={[
+                      styles.dropdownItem,
+
+                      isNearest &&
+                        styles.nearestHighlight,
+
+                      isDisabled &&
+                        styles.disabledItem,
+                    ]}
+                    onPress={() => {
+                      if (
+                        !isDisabled
+                      ) {
+                        setShowDropdown(
+                          false,
+                        );
+
+                        dispatch(
+                          setRestaurant(
+                            restaurant,
+                          ),
+                        );
+
+                        dispatch(
+                          setExperience({
+                            id: experienceId,
+                            type: selectedExperience,
+                            restaurant,
+                          }),
+                        );
+                      }
+                    }}>
+                    <View
+                      style={
+                        styles.restaurantRow
+                      }>
+                      <View
+                        style={{
+                          flex: 1,
+                        }}>
+                        <Text
                           style={[
-                            styles.distanceText,
-                            isDisabled && styles.disabledDistanceText,
-                          ]}
-                        >
-                          {restaurant.distance.toFixed(1)} km away
+                            styles.dropdownText,
+
+                            selectedRestaurantId ===
+                              restaurantId && {
+                              color:
+                                '#e91e3c',
+                              fontWeight:
+                                'bold',
+                            },
+
+                            isDisabled &&
+                              styles.disabledText,
+                          ]}>
+                          {restaurant?.name ||
+                            'Restaurant'}
                         </Text>
-                      )}
-                      {!isWithinRange &&
-                        typeof restaurant.distance === 'number' && (
-                          <Text style={styles.outOfRangeText}>
-                            Outside {DELIVERY_RADIUS_KM} km delivery range
+
+                        {restaurant?.isActive ===
+                          false && (
+                          <Text
+                            style={
+                              styles.inactiveText
+                            }>
+                            Currently
+                            unavailable
                           </Text>
                         )}
-                    </View>
-                    
-                    {/* Show badge for nearest */}
-                    {isNearest && (
-                      <View style={styles.nearestBadgeContainer}>
-                        <Text style={styles.nearestBadge}>✓</Text>
-                        <Text style={styles.nearestBadgeText}>Nearest</Text>
-                      </View>
-                    )}
 
-                    {/* Show disabled icon for others */}
-                    {isDisabled && (
-                      <Text style={styles.disabledIcon}>🚫</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                        {typeof restaurant?.distance ===
+                          'number' && (
+                          <Text
+                            style={[
+                              styles.distanceText,
+
+                              isDisabled &&
+                                styles.disabledDistanceText,
+                            ]}>
+                            {restaurant.distance.toFixed(
+                              1,
+                            )}{' '}
+                            km away
+                          </Text>
+                        )}
+
+                        {!isWithinRange &&
+                          typeof restaurant?.distance ===
+                            'number' && (
+                            <Text
+                              style={
+                                styles.outOfRangeText
+                              }>
+                              Outside{' '}
+                              {
+                                DELIVERY_RADIUS_KM
+                              }{' '}
+                              km delivery
+                              range
+                            </Text>
+                          )}
+                      </View>
+
+                      {/* NEAREST */}
+                      {isNearest && (
+                        <View
+                          style={
+                            styles.nearestBadgeContainer
+                          }>
+                          <Text
+                            style={
+                              styles.nearestBadge
+                            }>
+                            ✓
+                          </Text>
+
+                          <Text
+                            style={
+                              styles.nearestBadgeText
+                            }>
+                            Nearest
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* DISABLED */}
+                      {isDisabled && (
+                        <Text
+                          style={
+                            styles.disabledIcon
+                          }>
+                          🚫
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              },
+            )}
           </ScrollView>
 
-          {/* Info Footer */}
-          <View style={styles.dropdownFooter}>
+          {/* FOOTER */}
+          <View
+            style={styles.dropdownFooter}>
             <Text style={styles.footerText}>
-              📍 Branches within {DELIVERY_RADIUS_KM} km are selectable. Beyond that are view-only.
+              📍 Branches within{' '}
+              {DELIVERY_RADIUS_KM} km are
+              selectable.
             </Text>
           </View>
         </View>
       )}
 
-      {/* Veg / Non-Veg Toggle */}
+      {/* TOGGLE */}
       <View style={styles.toggleWrapper}>
         <ToggleComponents />
       </View>

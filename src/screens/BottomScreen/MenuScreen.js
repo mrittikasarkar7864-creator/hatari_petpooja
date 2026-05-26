@@ -429,97 +429,149 @@ const CatItemScreen = () => {
 
   // ================= RENDER ITEM =================
 
-  const renderItem = ({item}) => {
-    const dataItem = item.food || item;
+const renderItem = ({item}) => {
+  const dataItem = item?.food || item;
 
-    const isFoodAvailable =
-      resId && dataItem.available !== false;
+  console.log(dataItem, '-----------------------dataitem');
 
-    return (
-      <View style={styles.card}>
+  const isFoodAvailable =
+    resId && dataItem?.available !== false;
+
+  // ================= IMAGE =================
+  const foodImage =
+    dataItem?.image ||
+    dataItem?.raw?.item_image_url ||
+    dataItem?.raw?.rawPayload?.item_image_url ||
+    'https://cdn-icons-png.flaticon.com/512/1046/1046784.png';
+
+  // ================= PRICE =================
+  const hasVariation =
+    dataItem?.priceInfo?.hasVariation;
+
+  const staticPrice =
+    dataItem?.priceInfo?.staticPrice ||
+    dataItem?.raw?.price ||
+    0;
+
+  const halfPrice =
+    dataItem?.priceInfo?.halfPrice || 0;
+
+  const fullPrice =
+    dataItem?.priceInfo?.fullPrice || 0;
+
+  // ================= CUISINE =================
+  const cuisineText = Array.isArray(
+    dataItem?.cuisineType,
+  )
+    ? dataItem?.cuisineType?.join(', ')
+    : dataItem?.cuisineType || 'Delicious Food';
+
+  const resolvedType = (dataItem?.type || '').toLowerCase().trim();
+  const isVegItem =
+    resolvedType === 'veg' ||
+    resolvedType === '1' ||
+    resolvedType === 'vegetarian';
+  const isVeg = isVegItem;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      style={styles.card}>
+      {/* ================= FOOD IMAGE ================= */}
+      <View style={styles.imageWrapper}>
         <Image
-          source={{uri: dataItem.image}}
+          source={{uri: foodImage}}
           style={styles.image}
         />
 
-        <View style={styles.details}>
-          <Text style={styles.cuisine}>
-            {dataItem.cuisineType || ''}
-          </Text>
+        {/* VEG / NON VEG BADGE */}
+        <View
+          style={[
+            styles.vegBadge,
+            {
+              borderColor: isVeg
+                ? '#1BA672'
+                : '#D7263D',
+            },
+          ]}>
+          <View
+            style={[
+              styles.vegDot,
+              {
+                backgroundColor: isVeg
+                  ? '#1BA672'
+                  : '#D7263D',
+              },
+            ]}
+          />
+        </View>
+      </View>
 
-          <View style={styles.row}>
-            <View
-              style={[
-                styles.typeBox,
-                {
-                  borderColor:
-                    (dataItem.type || '').toLowerCase() ===
-                    'veg'
-                      ? 'green'
-                      : 'red',
-                },
-              ]}>
-              <View
-                style={[
-                  styles.typeDot,
-                  {
-                    backgroundColor:
-                      (dataItem.type || '').toLowerCase() ===
-                      'veg'
-                        ? 'green'
-                        : 'red',
-                  },
-                ]}
-              />
-            </View>
+      {/* ================= DETAILS ================= */}
+      <View style={styles.details}>
+        <Text
+          style={styles.name}
+          numberOfLines={1}>
+          {dataItem?.name || 'Food Item'}
+        </Text>
 
-            <Text
-              style={styles.name}
-              numberOfLines={1}>
-              {dataItem.name}
+        <Text
+          style={styles.cuisine}
+          numberOfLines={1}>
+          {cuisineText}
+        </Text>
+
+        {/* PRICE */}
+        {hasVariation ? (
+          <View style={{marginTop: 6}}>
+            <Text style={styles.priceText}>
+              Half: ₹{halfPrice}
+            </Text>
+
+            <Text style={styles.priceText}>
+              Full: ₹{fullPrice}
             </Text>
           </View>
-
-          {dataItem.priceInfo?.hasVariation ? (
-            <>
-              <Text style={styles.priceText}>
-                Half: ₹{dataItem.priceInfo.halfPrice}
-              </Text>
-
-              <Text style={styles.priceText}>
-                Full: ₹{dataItem.priceInfo.fullPrice}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.priceText}>
-              ₹{dataItem.priceInfo?.staticPrice}
-            </Text>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.addBtn,
-            !isFoodAvailable && {
-              backgroundColor: '#ccc',
-            },
-          ]}
-          onPress={() => {
-            if (!isFoodAvailable) {
-              alert('Food not available');
-
-              return;
-            }
-
-            openModal(dataItem);
-          }}>
-          <Text style={styles.addText}>
-            {isFoodAvailable ? 'Add' : 'Unavailable'}
+        ) : (
+          <Text style={styles.priceMain}>
+            ₹{staticPrice}
           </Text>
-        </TouchableOpacity>
+        )}
+
+        {/* DESCRIPTION */}
+        {!!dataItem?.description && (
+          <Text
+            style={styles.description}
+            numberOfLines={2}>
+            {dataItem?.description}
+          </Text>
+        )}
       </View>
-    );
-  };
+
+      {/* ================= ADD BUTTON ================= */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={[
+          styles.addBtn,
+          !isFoodAvailable && styles.disabledBtn,
+        ]}
+        onPress={() => {
+          if (!isFoodAvailable) {
+            alert('Food not available');
+            return;
+          }
+
+          openModal(dataItem);
+        }}>
+        <Text style={styles.addText}>
+          {isFoodAvailable
+            ? 'ADD +'
+            : 'Unavailable'}
+        </Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+};
 
   // ================= KEY =================
 
@@ -990,45 +1042,105 @@ export default CatItemScreen;
 // ================= STYLES =================
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8F8F8',
+  },
+
+  // ================= SEARCH =================
   searchBox: {
-    margin: 15,
-    marginTop: -10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
 
   searchInput: {
     backgroundColor: '#fff',
-    height: 45,
+    height: 50,
     borderRadius: 30,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     color: '#000',
+    fontSize: 15,
+
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowRadius: 5,
+
     elevation: 3,
   },
 
+  // ================= FOOD CARD =================
   card: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 10,
-    marginBottom: 14,
     alignItems: 'center',
-    elevation: 3,
+    backgroundColor: '#fff',
+
+  
+    marginVertical: 8,
+
+    borderRadius: 20,
+    padding: 12,
+
+    shadowColor: '#000',
+    shadowOpacity: 0.07,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowRadius: 6,
+
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F5E9E2',
+  },
+
+  imageWrapper: {
+    position: 'relative',
   },
 
   image: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#eee',
+    width: 95,
+    height: 95,
+    borderRadius: 16,
+    backgroundColor: '#F1F1F1',
+  },
+
+  vegBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+
+    width: 18,
+    height: 18,
+
+    borderWidth: 1.5,
+    borderRadius: 4,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    backgroundColor: '#fff',
+  },
+
+  vegDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 10,
   },
 
   details: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 14,
+    justifyContent: 'center',
   },
 
   cuisine: {
     fontSize: 12,
-    color: '#666',
+    color: '#8A8A8A',
     fontWeight: '600',
   },
 
@@ -1054,60 +1166,92 @@ const styles = StyleSheet.create({
   },
 
   name: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: '#222',
     width: '90%',
   },
 
+  description: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#777',
+    lineHeight: 18,
+  },
+
+  priceMain: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#E53935',
+  },
+
   priceText: {
-    color: '#444',
-    marginTop: 5,
-    fontSize: 13,
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
   },
 
   addBtn: {
-    backgroundColor: '#FF4D4D',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 22,
+    backgroundColor: '#E53935',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 85,
+  },
+
+  disabledBtn: {
+    backgroundColor: '#BDBDBD',
   },
 
   addText: {
     color: '#fff',
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
 
+  // ================= SHIMMER =================
   shimmerRow: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 10,
-    marginBottom: 15,
+    borderRadius: 18,
+    padding: 12,
+    marginHorizontal: 14,
+    marginVertical: 8,
     alignItems: 'center',
-    height: 90,
+    height: 100,
+
+    elevation: 2,
   },
 
+  // ================= MODAL =================
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
 
   modalContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-    padding: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 25,
+    maxHeight: '90%',
   },
 
   modalHandle: {
-    width: 60,
+    width: 65,
     height: 6,
     borderRadius: 10,
-    backgroundColor: '#ddd',
+    backgroundColor: '#D9D9D9',
     alignSelf: 'center',
-    marginBottom: 15,
+    marginBottom: 18,
   },
 
   modalHeader: {
@@ -1116,42 +1260,45 @@ const styles = StyleSheet.create({
   },
 
   modalImg: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 90,
+    height: 90,
+    borderRadius: 16,
+    backgroundColor: '#F3F3F3',
   },
 
   modalCuisine: {
-    color: '#888',
+    color: '#8A8A8A',
     fontSize: 13,
+    marginBottom: 4,
   },
 
   modalFoodName: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: '700',
+    color: '#111',
+    fontSize: 20,
+    fontWeight: '800',
   },
 
+  // ================= VARIANTS =================
   optionRow: {
     flexDirection: 'row',
-    marginTop: 14,
+    marginTop: 18,
   },
 
   optionBtn: {
-    borderWidth: 1,
-    borderColor: '#FF4D4D',
+    borderWidth: 1.5,
+    borderColor: '#E53935',
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     marginRight: 10,
   },
 
   selectedOption: {
-    backgroundColor: '#FF4D4D',
+    backgroundColor: '#E53935',
   },
 
   optionText: {
-    color: '#FF4D4D',
+    color: '#E53935',
     fontWeight: '700',
   },
 
@@ -1160,103 +1307,115 @@ const styles = StyleSheet.create({
   },
 
   staticPrice: {
-    marginTop: 10,
-    color: '#FF4D4D',
-    fontWeight: '700',
+    marginTop: 14,
+    color: '#E53935',
+    fontWeight: '800',
+    fontSize: 20,
   },
 
   modalDescription: {
-    marginTop: 12,
+    marginTop: 14,
     color: '#666',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontSize: 14,
   },
 
+  // ================= ADDONS =================
   addonTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 10,
-    color: '#000',
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 12,
+    marginTop: 18,
+    color: '#111',
   },
 
   addonItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff5f5',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
   },
 
   addonImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 10,
-    marginRight: 10,
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#F2F2F2',
   },
 
   addonName: {
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: '700',
+    color: '#111',
+    fontSize: 14,
   },
 
   addonPrice: {
-    color: '#FF4D4D',
-    marginTop: 2,
+    color: '#E53935',
+    marginTop: 4,
+    fontWeight: '600',
   },
 
+  // ================= QUANTITY =================
   quantityBox: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 24,
   },
 
   qtyBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 22,
     backgroundColor: '#FFEAEA',
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   qtyText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FF4D4D',
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#E53935',
   },
 
   qtyValue: {
-    marginHorizontal: 20,
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
+    marginHorizontal: 24,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111',
   },
 
+  // ================= FOOTER =================
   modalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 10,
   },
 
   totalPrice: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#111',
   },
 
   confirmBtn: {
-    backgroundColor: '#FF4D4D',
-    paddingHorizontal: 22,
-    paddingVertical: 12,
-    borderRadius: 24,
+    backgroundColor: '#E53935',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
   },
 
   confirmBtnText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: '800',
+    fontSize: 15,
   },
 
+  // ================= BOTTOM BOX =================
   bottomBox: {
     position: 'absolute',
     bottom: Platform.OS === 'android' ? 90 : 60,
@@ -1265,45 +1424,52 @@ const styles = StyleSheet.create({
   },
 
   bottomGradient: {
-    padding: 15,
-    borderRadius: 20,
+    padding: 18,
+    borderRadius: 22,
   },
 
   bottomMsg: {
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 10,
-    fontWeight: '600',
+    marginBottom: 12,
+    fontWeight: '700',
+    fontSize: 14,
   },
 
   bottomBtn: {
     backgroundColor: '#fff',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 30,
-    borderRadius: 25,
+    borderRadius: 30,
     alignSelf: 'center',
   },
 
   bottomBtnText: {
-    color: '#FF4D4D',
-    fontWeight: '700',
+    color: '#E53935',
+    fontWeight: '800',
+    fontSize: 14,
   },
 
+  // ================= CLOSED =================
   closedContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+    paddingHorizontal: 20,
   },
 
   closedTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FF4D4D',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#E53935',
   },
 
   closedSubtitle: {
-    marginTop: 8,
+    marginTop: 10,
     color: '#777',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

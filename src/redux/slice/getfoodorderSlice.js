@@ -10,7 +10,7 @@ export const fetchFoodOrders = createAsyncThunk(
       console.log(response,"-------------------------------foodOrders");
       
       // ✅ Return only the array
-      return response.data || [];
+      return response.data?.orders || [];
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || error.message

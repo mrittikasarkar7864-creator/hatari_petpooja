@@ -59,7 +59,11 @@ const HomeScreen = () => {
    const selectedRestaurant = useSelector(
     state => state.experience.selectedRestaurant,
   );
-  const resId = selectedRestaurant?._id;
+  const resId =
+    selectedRestaurant?.restaurantId ??
+    selectedRestaurant?._id ??
+    selectedRestaurant?.id ??
+    null;
   console.log(resId, '----------------------resIdhome');
 
   const {
@@ -190,7 +194,7 @@ const HomeScreen = () => {
 
   // Fetch menu/trending food when branch or veg filter changes
   useEffect(() => {
-    if (!isFocused) {
+    if (!isFocused || !resId) {
       return;
     }
 
@@ -198,15 +202,10 @@ const HomeScreen = () => {
 
     const loadFoodData = async () => {
       try {
-        if (!resId) {
-          setFoods([]);
-          return;
-        }
-
         await dispatch(
           fetchFoodPagination({
             page: 1,
-            limit: 1,
+            limit: 20,
             type: foodType,
             search: '',
             restaurantId: resId,
@@ -511,6 +510,7 @@ const HomeScreen = () => {
           return <Animated.View key={i} style={[styles.dot, { opacity }]} />;
         })}
       </View>
+      {/* <Text>jjhjjj</Text> */}
 
       {/* Categories */}
       <SectionDivider title={categorySectionTitle} />

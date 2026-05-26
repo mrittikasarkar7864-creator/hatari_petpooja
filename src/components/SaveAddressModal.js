@@ -40,6 +40,7 @@ const SaveAddressModal = ({
   addressDetails,
   latitude,
   longitude,
+  petpoojaAddress,
 }) => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -50,15 +51,42 @@ const SaveAddressModal = ({
     const { experienceId, selectedRestaurant } = useSelector(
       state => state.experience
     );
-    console.log(selectedRestaurant, "selectedRestaurant in save address modal");
     
   const { loading } = useSelector((state) => state.address);
   const { experienceType } = useSelector((state) => state.experience);
 
-  const minDistance = deliveryData?.minimum_distance || 10;
+  const rawMinDistance = deliveryData?.minimum_distance;
+  const minDistance = Number.isFinite(Number(rawMinDistance))
+    ? Number(rawMinDistance)
+    : 10;
 
-  const restaurantLat = selectedRestaurant?.lat;
-  const restaurantLng = selectedRestaurant?.lng;
+  const toNumber = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const getRestaurantCoordinates = (restaurant) => {
+    return {
+      lat:
+        toNumber(restaurant?.lat) ??
+        toNumber(restaurant?.latitude) ??
+        toNumber(restaurant?.location?.lat) ??
+        toNumber(restaurant?.location?.latitude) ??
+        toNumber(restaurant?.coordinates?.[1]) ??
+        null,
+      lng:
+        toNumber(restaurant?.lng) ??
+        toNumber(restaurant?.longitude) ??
+        toNumber(restaurant?.location?.lng) ??
+        toNumber(restaurant?.location?.longitude) ??
+        toNumber(restaurant?.coordinates?.[0]) ??
+        null,
+    };
+  };
+
+  const { lat: restaurantLat, lng: restaurantLng } = getRestaurantCoordinates(
+    selectedRestaurant
+  );
 
   const [selectedTag, setSelectedTag] = useState("Home");
   const [name, setName] = useState("");
@@ -80,6 +108,28 @@ const SaveAddressModal = ({
     setState(addressDetails?.state || "");
   }, [location, addressDetails]);
 
+  // Initialize from PetPooja address format if provided
+  useEffect(() => {
+    if (petpoojaAddress) {
+      setName(petpoojaAddress?.name || "");
+      setContact(petpoojaAddress?.phone || "");
+      setFlat(petpoojaAddress?.addressLine?.split(',')[0] || "");
+      setLandmark(petpoojaAddress?.landmark || "");
+      setAddress(petpoojaAddress?.addressLine || "");
+      setPin(petpoojaAddress?.pincode || "");
+      setCity(petpoojaAddress?.city || "");
+      setState(petpoojaAddress?.state || "");
+
+      // Map label to selectedTag
+      const label = petpoojaAddress?.label || "Home";
+      if (["Home", "Work", "Other"].includes(label)) {
+        setSelectedTag(label);
+      } else {
+        setSelectedTag("Home");
+      }
+    }
+  }, [petpoojaAddress]);
+
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
@@ -95,75 +145,144 @@ const SaveAddressModal = ({
 
   /* ---------------- Distance ---------------- */
   const getDistanceKm = (lat1, lon1, lat2, lon2) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+    const a = Number(lat1);
+    const b = Number(lon1);
+    const c = Number(lat2);
+    const d = Number(lon2);
+
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || !Number.isFinite(d)) {
+      return null;
+    }
+
     const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
+    const dLat = ((c - a) * Math.PI) / 180;
+    const dLon = ((d - b) * Math.PI) / 180;
+    const h =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
+      Math.cos((a * Math.PI) / 180) *
+        Math.cos((c * Math.PI) / 180) *
         Math.sin(dLon / 2) ** 2;
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    return R * (2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)));
   };
 
   /* ---------------- Save ---------------- */
-  const validateAndSave = async () => {
-    if (!name || !contact || !flat || !address || !pin || !city || !state) {
-      showMessage("Please fill all required fields");
-      return;
-    }
+const validateAndSave = async () => {
+  if (!name || !contact || !flat || !address || !pin || !city || !state) {
+    showMessage("Please fill all required fields");
+    return;
+  }
 
-    const distance = getDistanceKm(
-      latitude,
-      longitude,
-      restaurantLat,
-      restaurantLng
-    );
+  const distance = getDistanceKm(
+    latitude,
+    longitude,
+    restaurantLat,
+    restaurantLng
+  );
 
-    if (distance > minDistance) {
-      showMessage(`Delivery available only within ${minDistance} km`);
-      return;
-    }
+  if (distance != null && distance > minDistance + 0.1) {
+    showMessage(`Delivery available only within ${minDistance} km`);
+    return;
+  }
 
-    const finalData = {
-      name,
-      mobileNumber: contact,
-      apartment: flat,
-      landmark,
-      address,
-      pin,
-      area,
-      city,
-      state,
-      type: experienceType,
-      lat: latitude,
-      lng: longitude,
-      addressType: selectedTag,
+  // ===============================
+  // FIXED ADDRESS OBJECT
+  // ===============================
+  const finalData = {
+    name,
+    phone: contact,
+    mobileNumber: contact,
+
+    apartment: flat,
+    landmark,
+
+    // support both formats
+    address,
+    addressLine: address,
+
+    pin,
+    area,
+    city,
+    state,
+
+    type: experienceType,
+
+    // support both formats
+    latitude,
+    longitude,
+
+    lat: latitude,
+    lng: longitude,
+
+    addressType: selectedTag,
+  };
+
+  console.log(finalData, "FINAL ADDRESS DATA");
+
+  try {
+    const res = await dispatch(addAddress(finalData)).unwrap();
+
+    console.log(res, "ADDRESS API RESPONSE");
+
+    // ===============================
+    // SAFE RESPONSE HANDLING
+    // ===============================
+    const savedAddressData =
+      res?.newAddress ||
+      res?.address ||
+      res?.data ||
+      finalData;
+
+    // ===============================
+    // MERGE FALLBACK VALUES
+    // ===============================
+    const completeAddress = {
+      ...finalData,
+      ...savedAddressData,
+
+      // ensure coordinates always exist
+      latitude:
+        savedAddressData?.latitude ||
+        savedAddressData?.lat ||
+        latitude,
+
+      longitude:
+        savedAddressData?.longitude ||
+        savedAddressData?.lng ||
+        longitude,
+
+      lat:
+        savedAddressData?.lat ||
+        savedAddressData?.latitude ||
+        latitude,
+
+      lng:
+        savedAddressData?.lng ||
+        savedAddressData?.longitude ||
+        longitude,
     };
 
-    try {
-      const res = await dispatch(addAddress(finalData)).unwrap();
+    console.log(completeAddress, "COMPLETE ADDRESS");
 
-      if (res?.success && res?.newAddress) {
-        await AsyncStorage.setItem(
-          "savedAddress",
-          JSON.stringify(res.newAddress)
-        );
+    // ===============================
+    // SAVE TO STORAGE
+    // ===============================
+    await AsyncStorage.setItem(
+      "savedAddress",
+      JSON.stringify(completeAddress)
+    );
 
-        showMessage("Address saved successfully");
-        onRequestClose();
+    showMessage("Address saved successfully");
 
-        setTimeout(() => {
-          navigation.navigate("OrderSummaryScreen");
-        }, 400);
-      } else {
-        showMessage("Failed to save address");
-      }
-    } catch (err) {
-      showMessage("Something went wrong");
-    }
-  };
+    onRequestClose();
+
+    setTimeout(() => {
+      navigation.navigate("OrderSummaryScreen");
+    }, 400);
+  } catch (err) {
+    console.log(err, "SAVE ADDRESS ERROR");
+    showMessage("Something went wrong");
+  }
+};
 
   return (
     
@@ -278,28 +397,7 @@ const SaveAddressModal = ({
                 maxLength={6}
               />
 
-              {/* Address Tags */}
-              <View style={styles.saveAsRow}>
-                {["Home", "Work", "Other"].map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tag,
-                      selectedTag === tag && styles.activeTag,
-                    ]}
-                    onPress={() => setSelectedTag(tag)}
-                  >
-                    <Text
-                      style={[
-                        styles.tagText,
-                        selectedTag === tag && styles.activeTagText,
-                      ]}
-                    >
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+           
             </ScrollView>
 
             {/* Save Button fixed at bottom */}

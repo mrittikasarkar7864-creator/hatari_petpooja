@@ -31,6 +31,38 @@ const DEFAULT_REGION = {
   longitudeDelta: 0.01,
 };
 
+const toNumber = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const isValidCoordinate = (lat, lng) => {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+};
+
+const getAddressCoordinates = (address) => {
+  const lat =
+    toNumber(address?.lat) ??
+    toNumber(address?.latitude) ??
+    toNumber(address?.customerLatitude) ??
+    null;
+
+  const lng =
+    toNumber(address?.lng) ??
+    toNumber(address?.longitude) ??
+    toNumber(address?.customerLongitude) ??
+    null;
+
+  return { lat, lng };
+};
+
 const MapScreen = ({ navigation }) => {
   const mapRef = useRef(null);
   const geocodeDeniedShownRef = useRef(false);
@@ -66,13 +98,17 @@ const MapScreen = ({ navigation }) => {
       const saved = await AsyncStorage.getItem("savedAddress");
       if (saved) {
         const addr = JSON.parse(saved);
-        const lat = parseFloat(addr.lat);
-        const lng = parseFloat(addr.lng);
+        const { lat, lng } = getAddressCoordinates(addr);
+
+        if (!isValidCoordinate(lat, lng)) {
+          requestLocationPermission();
+          return;
+        }
 
         setLocation({
           latitude: lat,
           longitude: lng,
-          description: addr.address || addr.area || "Saved Address",
+          description: addr.addressLine || addr.address || addr.area || "Saved Address",
         });
 
         setAddressDetails({
@@ -301,7 +337,7 @@ const MapScreen = ({ navigation }) => {
               scrollEnabled={true}
               zoomEnabled={true}
             >
-              {location && (
+              {location && isValidCoordinate(location.latitude, location.longitude) && (
                 <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} />
               )}
             </MapView>

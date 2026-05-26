@@ -25,12 +25,21 @@ const normalizeTypeToken = token => {
     return '';
   }
 
-  if (value === 'nonveg' || value === 'non veg') {
+  // PetPooja numeric attribute IDs
+  if (value === '1') return 'veg';
+  if (value === '2') return 'non-veg';
+  if (value === '24' || value === '3') return 'egg';
+
+  if (value === 'nonveg' || value === 'non veg' || value === 'non-veg') {
     return 'non-veg';
   }
 
-  if (value === 'vegetarian') {
+  if (value === 'vegetarian' || value === 'veg') {
     return 'veg';
+  }
+
+  if (value === 'egg' || value === 'eggetarian') {
+    return 'egg';
   }
 
   return value;
@@ -95,14 +104,16 @@ export const getFoodTypeTokens = item => {
 export const getFoodTypeMeta = item => {
   const tokens = getFoodTypeTokens(item);
 
-  const isVeg = tokens.includes('veg');
-  const isNonVeg = tokens.some(token => NON_VEG_KEYWORDS.includes(token));
+  const isNonVeg = tokens.includes('non-veg') || tokens.some(token => NON_VEG_KEYWORDS.includes(token));
+  const isEgg = tokens.includes('egg');
+  const isVeg = !isNonVeg && !isEgg && tokens.includes('veg');
 
   return {
     isVeg,
     isNonVeg,
-    label: isVeg ? 'Veg Special' : isNonVeg ? 'Non Veg Special' : 'Food Special',
-    color: isVeg ? 'green' : isNonVeg ? 'red' : '#777',
+    isEgg,
+    label: isVeg ? 'Veg Special' : isNonVeg ? 'Non Veg Special' : isEgg ? 'Egg Special' : 'Food Special',
+    color: isVeg ? 'green' : isNonVeg ? 'red' : isEgg ? 'orange' : '#777',
   };
 };
 
@@ -114,8 +125,11 @@ export const shouldIncludeByVegFilter = (item, isVegFilter) => {
   const { isVeg, isNonVeg } = getFoodTypeMeta(item);
 
   if (isVegFilter === true) {
+    // veg filter ON: show only veg items
     return isVeg;
   }
 
-  return isNonVeg;
+  // non-veg filter ON: show non-veg AND egg items
+  // also include items whose type could not be determined (unknown) to avoid hiding everything
+  return isNonVeg || (!isVeg);
 };

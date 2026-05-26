@@ -1,5 +1,5 @@
 // OrderSummaryScreen.js
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,50 +13,51 @@ import {
   Dimensions,
   Alert,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation} from '@react-navigation/native';
-import {useDispatch, useSelector} from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
 import DashboardScreen from '../components/DashboardScreen';
-import {clearCart} from '../redux/slice/cartSlice';
-import {fetchDeliverySettings} from '../redux/slice/deliverySettingsSlice';
-import {fetchCoupons} from '../redux/slice/couponSlice';
-import {postBilling} from '../redux/slice/postBillingSlice';
-import {fetchUserAddresses} from '../redux/slice/saveaddressSlice';
-import {fetchPetpoojaCartCalculate} from '../redux/slice/CartPetpoojaSlice';
-import {deleteUserAddress} from '../redux/slice/AddressDeleteSlice';
+import { clearCart } from '../redux/slice/cartSlice';
+import { fetchDeliverySettings } from '../redux/slice/deliverySettingsSlice';
+import { fetchCoupons } from '../redux/slice/couponSlice';
+import { postBilling } from '../redux/slice/postBillingSlice';
+import { fetchUserAddresses } from '../redux/slice/saveaddressSlice';
+import { fetchPetpoojaCartCalculate } from '../redux/slice/CartPetpoojaSlice';
+import { deleteUserAddress } from '../redux/slice/AddressDeleteSlice';
 import CustomHeader from '../components/CustomHeader';
-import {calculateTotalPackingCharge} from '../utils/packingChargesConfig';
+import { calculateTotalPackingCharge } from '../utils/packingChargesConfig';
 import {
   getClosedHoursMessage,
   isOrderTypeBlockedNow,
 } from '../utils/restaurantHours';
 
-const {width} = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const OrderSummaryScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
-  const {selectedRestaurant, experienceType, experienceId} = useSelector(
+  const { selectedRestaurant, experienceType, experienceId } = useSelector(
     state => state.experience,
   );
-  const {addresses, loading} = useSelector(state => state.address);
-  const {items: cartItems} = useSelector(state => state.cart);
-  console.log(cartItems,"-------------------cartItems");
+  const { addresses, loading } = useSelector(state => state.address);
+  const { items: cartItems } = useSelector(state => state.cart);
+  console.log(cartItems, "-------------------cartItems");
   const cartData = useSelector(state => state.cartPetpooja);
-  console.log(cartData,"-------------------cartData");
-  
-  const calculatedCart = useSelector(state => state.cartPetpooja.calculatedCart);
-  
+  console.log(cartData, "-------------------cartData");
 
-  const {token} = useSelector(state => state.auth);
-  const {data} = useSelector(state => state.deliverySettings);
+  const calculatedCart = useSelector(state => state.cartPetpooja.calculatedCart);
+
+
+  const { token } = useSelector(state => state.auth);
+  const { data } = useSelector(state => state.deliverySettings);
   console.log(data, '------------------deliverySettings---------------------');
-  
+
   const couponState = useSelector(state => state.coupons);
 
 
@@ -82,25 +83,26 @@ const OrderSummaryScreen = () => {
 
   const couponList = (rawCouponList || []).map(normalizeCoupon);
   console.log(couponList, '------------------couponList---------------------');
-  
+
 
   const [savedAddress, setSavedAddress] = useState(null);
-  console.log(savedAddress,"------------------------savedAddress");
-  
+  console.log(savedAddress, "------------------------savedAddress");
+
   const [userid, setUserId] = useState(null);
   const [selectedCoupon, setSelectedCoupon] = useState(null);
   const [codModalVisible, setCodModalVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [localAddresses, setLocalAddresses] = useState([]);
+  const isNavigatingToMapRef = useRef(false);
 
-    const restaurantList = useSelector(state => state.restaurants.list || []);
-    console.log(restaurantList,"restaurantList");
-  
-    const getRestaurantId = restaurant =>
-      restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id;
-  
-    const selectedRestaurantId = getRestaurantId(selectedRestaurant);
-    console.log(selectedRestaurantId,"---id--");
+  const restaurantList = useSelector(state => state.restaurants.list || []);
+  console.log(restaurantList, "restaurantList");
+
+  const getRestaurantId = restaurant =>
+    restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id;
+
+  const selectedRestaurantId = getRestaurantId(selectedRestaurant);
+  console.log(selectedRestaurantId, "---id--");
 
   // Fetch delivery settings, coupons, and addresses
   useEffect(() => {
@@ -127,10 +129,10 @@ const OrderSummaryScreen = () => {
   // Recalculate petpooja cart when address or cart changes
   useEffect(() => {
     const lat =
-      savedAddress?.latitude || savedAddress?.lat || savedAddress?.customerLatitude ;
+      savedAddress?.latitude || savedAddress?.lat || savedAddress?.customerLatitude;
     const lng =
       savedAddress?.longitude || savedAddress?.lng || savedAddress?.customerLongitude;
-      console.log(lat, lng,"-------------------latlng for cart calculate---------------------");
+    console.log(lat, lng, "-------------------latlng for cart calculate---------------------");
 
     // dispatch only if we have cart items or address
     if ((cartItems && cartItems.length > 0) || savedAddress) {
@@ -201,6 +203,24 @@ const OrderSummaryScreen = () => {
     return getItemTotal(item);
   };
 
+  const getItemId = item =>
+    item?.itemId || item?.itemid || item?.item_id || item?.id || item?._id || '';
+
+  const getVariationId = item =>
+    item?.variationId || item?.variationid || item?.variation_id || item?.selectedOption || '';
+
+  const formatAddressString = address => {
+    const parts = [
+      address?.apartment || address?.flat || address?.house,
+      address?.addressLine || address?.address || address?.street || address?.area,
+      address?.city,
+      address?.state,
+      address?.pin || address?.pincode,
+    ].filter(Boolean);
+
+    return parts.join(', ');
+  };
+
   const itemTotal =
     Number(calculatedCart?.cart?.totals?.itemSubtotal) ||
     displayItems.reduce((sum, item) => sum + getDisplayItemTotal(item), 0);
@@ -214,12 +234,12 @@ const OrderSummaryScreen = () => {
   const packingFee =
     Number(calculatedCart?.cart?.totals?.packagingCharge) ||
     calculateTotalPackingCharge(cartItems, data?.packing_charge_per_item || 0);
-  
+
   console.log('🛵 PACKING FEE CALCULATION:');
   console.log('   Packing Charge Per Item (from API):', data?.packing_charge_per_item || 0);
   console.log('   Total Packing Fee:', packingFee);
   console.log('   Cart Items:', cartItems.map(item => `${item.name} (Qty: ${item.quantity})`));
-  
+
 
   let discount = 0;
   if (selectedCoupon) {
@@ -296,54 +316,95 @@ const OrderSummaryScreen = () => {
       return;
     }
 
-    const billingData = {
-      userId: userid,
-      restaurantId: selectedRestaurant?._id || '12345',
-      address: savedAddress?._id || '54321',
-      billingName: savedAddress?.name,
-      billingMobile:
-        savedAddress?.mobileNumber || savedAddress?.contact || '7864512300',
-      type: experienceType?.toLowerCase() || 'delivery',
-      deliveryCharges: Number(data?.delivery_charges_value) || 0,
-      foodDetails: cartItems.map(item => {
-        const quantity = Number(item.quantity || 1);
+    const customerLatitude =
+      Number(savedAddress?.latitude ?? savedAddress?.lat ?? savedAddress?.customerLatitude  );
+    const customerLongitude =
+      Number(savedAddress?.longitude ?? savedAddress?.lng ?? savedAddress?.customerLongitude );
+    console.log(customerLatitude, customerLongitude, "--------------------latlng for billing---------------------");
 
-        return {
-          foodId: item.id || item.foodId || item._id,
-          quantity,
-          variant: item.hasVariation ? item.selectedOption : null,
-          note: item?.note || '',
-          fullPrice:
-            item.hasVariation && item.selectedOption === 'full'
-              ? Number(item.priceInfo?.fullPrice || 0)
-              : null,
-          halfPrice:
-            item.hasVariation && item.selectedOption === 'half'
-              ? Number(item.priceInfo?.halfPrice || 0)
-              : null,
-          unitPrice: !item.hasVariation
-            ? Number(item.priceInfo?.staticPrice || item.unitPrice || 0)
-            : null,
-          addOns: (item.selectedAddOns || []).map(add => ({
-            name: add.name,
-            image: add.image || '',
-            type: add.type || '',
-            price: Number(add.price || 0),
-            quantity: add.quantity || 1,
-          })),
-        };
-      }),
-      totalAmount: grandTotal,
-      grossAmount: itemTotal,
-      packingCharge: packingFee,
-      CGST: cgstAmt,
-      SGST: sgstAmt,
-      couponCode: selectedCoupon?.code || null,
+    const addressLine = formatAddressString(savedAddress);
+
+    const customerData = {
+      name: savedAddress?.name || savedAddress?.billingName || 'Customer',
+      phone: savedAddress?.mobileNumber || savedAddress?.contact || '7864512300',
+      address: savedAddress?.address || savedAddress?.addressLine || addressLine,
+      addressLine,
+      landmark: savedAddress?.landmark || '',
+      city: savedAddress?.city || '',
+      state: savedAddress?.state || '',
+      pincode: savedAddress?.pin || savedAddress?.pincode || '',
+      latitude: customerLatitude,
+      longitude: customerLongitude,
+      label: savedAddress?.addressType || 'Home',
+      mobileNumber: savedAddress?.mobileNumber || savedAddress?.contact || '7864512300',
+    };
+
+    const petpoojaItems = (displayItems || []).map(item => ({
+      itemId: String(getItemId(item)),
+      variationId: String(getVariationId(item)),
+      quantity: Number(item.quantity || 1),
+      note: item?.note || '',
+      addons: (item.selectedAddOns || item.addons || item.AddonItem?.details || []).map(add => ({
+        addonItemId: String(add.addonItemId || add.id || add._id || ''),
+        quantity: Number(add.quantity || add.qty || 1),
+      })),
+    }));
+
+    const legacyFoodDetails = (displayItems || []).map(item => ({
+      foodId: item.id || item.foodId || item._id || '',
+      quantity: Number(item.quantity || 1),
+      variant: item.hasVariation ? item.selectedOption : null,
+      note: item?.note || '',
+      fullPrice:
+        item.hasVariation && item.selectedOption === 'full'
+          ? Number(item.priceInfo?.fullPrice || 0)
+          : null,
+      halfPrice:
+        item.hasVariation && item.selectedOption === 'half'
+          ? Number(item.priceInfo?.halfPrice || 0)
+          : null,
+      unitPrice: !item.hasVariation
+        ? Number(item.priceInfo?.staticPrice || item.unitPrice || 0)
+        : null,
+      addOns: (item.selectedAddOns || []).map(add => ({
+        name: add.name,
+        image: add.image || '',
+        type: add.type || '',
+        price: Number(add.price || 0),
+        quantity: add.quantity || 1,
+      })),
+    }));
+
+    const billingData = {
+      restaurantId: selectedRestaurantId || selectedRestaurant?._id || '12345',
+      customer: customerData,
+      latitude: customerLatitude,
+      longitude: customerLongitude,
+      billingName: customerData.name,
+      billingMobile: customerData.phone,
+      address: addressLine,
+      type: experienceType?.toLowerCase() || 'delivery',
+      paymentType: 'COD',
       paymentStatus: 'Pending',
+      orderMeta: {
+        restID: selectedRestaurantId || selectedRestaurant?._id || '12345',
+        restaurantId: selectedRestaurantId || selectedRestaurant?._id || '12345',
+        paymentType: 'COD',
+        orderType: experienceType?.toLowerCase() || 'delivery',
+        deliveryCharges: Number(calculatedCart?.cart?.totals?.deliveryCharges || data?.delivery_charges_value || 0),
+        packagingCharge: packingFee,
+        taxTotal: Number(cgstAmt || 0) + Number(sgstAmt || 0),
+        discountTotal: discount || 0,
+        total: grandTotal,
+        grossAmount: itemTotal,
+        couponCode: selectedCoupon?.code || null,
+      },
+      items: petpoojaItems,
+      foodDetails: legacyFoodDetails,
     };
 
     try {
-      console.log(billingData, '--------------------------billingDataoderSummary');
+      console.log('BILLING DATA:', billingData);
       await dispatch(postBilling(billingData)).unwrap();
       dispatch(clearCart());
       setCodModalVisible(false);
@@ -352,14 +413,18 @@ const OrderSummaryScreen = () => {
       navigation.navigate('OrderSuccessScreen');
     } catch (e) {
       console.log('Order confirmation failed:', e);
-      ToastAndroid.show('Order failed. Try again.', ToastAndroid.SHORT);
+      const errorMessage =
+        typeof e === 'string'
+          ? e
+          : e?.message || e?.payload || 'Order failed. Try again.';
+      ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
     }
   };
 
   const handleDeleteAddress = id => {
     setLocalAddresses(prev => prev.filter(item => item._id !== id));
     Alert.alert('Delete Address', 'Are you sure?', [
-      {text: 'Cancel', style: 'cancel'},
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
@@ -379,24 +444,52 @@ const OrderSummaryScreen = () => {
     ]);
   };
 
+  const navigateToMapScreen = (params = null, closeAddressModal = false) => {
+    if (isNavigatingToMapRef.current) {
+      return;
+    }
+
+    isNavigatingToMapRef.current = true;
+
+    if (closeAddressModal) {
+      setModalVisible(false);
+    }
+
+    InteractionManager.runAfterInteractions(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (params) {
+            navigation.navigate('MapScreen', params);
+          } else {
+            navigation.navigate('MapScreen');
+          }
+
+          setTimeout(() => {
+            isNavigatingToMapRef.current = false;
+          }, 500);
+        }, 180);
+      });
+    });
+  };
+
   return (
     <>
       <CustomHeader title=" My Order" />
       <DashboardScreen scrollable={false}>
-        <ScrollView contentContainerStyle={{paddingBottom: 200}}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 200 }}>
           {/* ADDRESS CARD */}
           <View style={styles.addressCard}>
             {savedAddress ? (
               <>
-                <View style={{flex: 1}}>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.addrName}>
-                    {savedAddress?.name} ({savedAddress?.addressType})
+                    {savedAddress?.name}
                   </Text>
                   <Text style={styles.addrDetails}>
-                    {savedAddress.flat}, {savedAddress.address},{' '}
-                    {savedAddress.pin}
+                    {savedAddress?.apartment || savedAddress?.flat}, {savedAddress?.addressLine || savedAddress?.address},{' '}
+                    {savedAddress?.pin}
                   </Text>
-                  <Text style={styles.addrPhone}>{savedAddress?.mobileNumber}</Text>
+                  <Text style={styles.addrPhone}>{savedAddress?.mobileNumber || savedAddress?.contact}</Text>
                 </View>
 
                 <TouchableOpacity
@@ -407,8 +500,8 @@ const OrderSummaryScreen = () => {
               </>
             ) : (
               <TouchableOpacity
-                onPress={() => navigation.navigate('MapScreen')}
-                style={{flexDirection: 'row', alignItems: 'center'}}>
+                onPress={() => navigateToMapScreen()}
+                style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Icon name="add-location-alt" size={22} color="red" />
                 <Text style={styles.addAddressText}>Add Delivery Address</Text>
               </TouchableOpacity>
@@ -427,7 +520,7 @@ const OrderSummaryScreen = () => {
                     : ['#e47369ff', '#db2b2bff']
                 }
                 style={styles.couponCard}>
-                <View style={{flex: 1}}>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.couponDesc}>{coupon.description}</Text>
                   <Text style={styles.couponDetails}>
                     Min ₹{coupon.minOrderAmount} | {coupon.discountDisplay}
@@ -460,11 +553,11 @@ const OrderSummaryScreen = () => {
 
               return (
                 <View key={key} style={styles.itemRow}>
-                  <Image source={{uri: item.image || item.imageUrl || ''}} style={styles.itemImage} />
-                  <View style={{flex: 1, marginLeft: 10}}>
+                  <Image source={{ uri: item.image || item.imageUrl || '' }} style={styles.itemImage} />
+                  <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.foodQtyPrice}>Qty: {qty}</Text>
-                    <View style={{flexDirection: 'row'}}>
+                    <View style={{ flexDirection: 'row' }}>
                       <Text style={styles.itemPrice}>
                         {formatCurrency(lineTotal)}{' '}
                         {item.variation_name || item.selectedOption
@@ -474,7 +567,7 @@ const OrderSummaryScreen = () => {
                     </View>
 
                     {item.AddonItem?.details?.length > 0 || item.selectedAddOns?.length > 0 ? (
-                      <Text style={{color: '#555', fontSize: 13}}>
+                      <Text style={{ color: '#555', fontSize: 13 }}>
                         {(item.AddonItem?.details || item.selectedAddOns || [])
                           .map(a => `${a.name} (+₹${a.price ?? a.amount ?? 0})`)
                           .join(', ')}
@@ -503,10 +596,10 @@ const OrderSummaryScreen = () => {
             {cartItems.map((item, index) =>
               item.selectedAddOns?.length > 0 ? (
                 <View key={index}>
-                  <Text style={{fontWeight: '600', marginTop: 10}}>
+                  <Text style={{ fontWeight: '600', marginTop: 10 }}>
                     {item.name}
                   </Text>
-               
+
                 </View>
               ) : null,
             )}
@@ -581,8 +674,8 @@ const OrderSummaryScreen = () => {
           visible={modalVisible}
           transparent
           animationType="slide"
-            presentationStyle="overFullScreen"   // ✅ REQUIRED FOR iOS
-  statusBarTranslucent                  
+          presentationStyle="overFullScreen"   // ✅ REQUIRED FOR iOS
+          statusBarTranslucent
           onRequestClose={() => setModalVisible(false)}>
           <View style={styles.savemodalView}>
             <View style={styles.modalHeader}>
@@ -594,14 +687,10 @@ const OrderSummaryScreen = () => {
 
             <TouchableOpacity
               style={styles.locationContainer}
-         onPress={() => {
-  setModalVisible(false);
-
-  setTimeout(() => {
-    navigation.navigate('MapScreen');
-  }, 300); // allow modal close animation
-}}
->
+              onPress={() => {
+                navigateToMapScreen(null, true);
+              }}
+            >
               <Text style={styles.locationText}>
                 Select your current location +
               </Text>
@@ -610,11 +699,11 @@ const OrderSummaryScreen = () => {
             {loading ? (
               <ActivityIndicator color="red" />
             ) : (
-              <ScrollView style={{maxHeight: 450}}>
+              <ScrollView style={{ maxHeight: 450 }}>
                 {localAddresses.map(item => (
                   <View key={item._id} style={styles.addressItem}>
                     <TouchableOpacity
-                      style={{flex: 1}}
+                      style={{ flex: 1 }}
                       onPress={async () => {
                         setSavedAddress(item);
                         await AsyncStorage.setItem(
@@ -645,16 +734,16 @@ const OrderSummaryScreen = () => {
                     )}
 
                     <TouchableOpacity
-                      onPress={() =>
-                        navigation.navigate('MapScreen', {editData: item})
-                      }
-                      style={{marginLeft: 10}}>
+                      onPress={() => {
+                        navigateToMapScreen({ editData: item }, true);
+                      }}
+                      style={{ marginLeft: 10 }}>
                       <Ionicons name="create-outline" size={22} color="blue" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       onPress={() => handleDeleteAddress(item._id)}
-                      style={{marginLeft: 10}}>
+                      style={{ marginLeft: 10 }}>
                       <Ionicons name="trash-outline" size={22} color="red" />
                     </TouchableOpacity>
                   </View>
@@ -688,7 +777,7 @@ const OrderSummaryScreen = () => {
                 onPress={() => setCodModalVisible(false)}
                 style={[
                   styles.modalBtn,
-                  {backgroundColor: '#ccc', marginTop: 8},
+                  { backgroundColor: '#ccc', marginTop: 8 },
                 ]}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -713,9 +802,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     elevation: 3,
   },
-  addrName: {fontSize: 15, fontWeight: '600', color: '#000'},
-  addrDetails: {fontSize: 13, color: '#444', marginTop: 4},
-  addrPhone: {fontSize: 13, marginTop: 2, color: '#444'},
+  addrName: { fontSize: 15, fontWeight: '600', color: '#000' },
+  addrDetails: { fontSize: 13, color: '#444', marginTop: 4 },
+  addrPhone: { fontSize: 13, marginTop: 2, color: '#444' },
   changeBtn: {
     alignSelf: 'center',
     paddingHorizontal: 14,
@@ -724,7 +813,7 @@ const styles = StyleSheet.create({
     borderColor: 'red',
     borderRadius: 8,
   },
-  changeText: {color: 'red', fontWeight: '700', fontSize: 12},
+  changeText: { color: 'red', fontWeight: '700', fontSize: 12 },
   addAddressText: {
     color: 'red',
     fontWeight: '600',
@@ -750,31 +839,31 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 10,
     marginBottom: 8,
- height: Platform.OS === 'android'
+    height: Platform.OS === 'android'
       ? Math.max(78, width - 400) // Android slightly taller
       : Math.max(130, width - 330),
 
 
   },
-  couponDesc: {color: '#fff', fontSize: 13, fontWeight: 'bold'},
-  couponDetails: {color: '#fff', fontSize: 12},
+  couponDesc: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+  couponDetails: { color: '#fff', fontSize: 12 },
   applyBtn: {
     backgroundColor: '#fff',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
     alignSelf: 'center',
-    right:20
+    right: 20
   },
-  applyText: {color: 'red', fontWeight: '700'},
+  applyText: { color: 'red', fontWeight: '700' },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  itemImage: {width: 55, height: 55, borderRadius: 8},
-  itemName: {fontSize: 14, fontWeight: '600', color: '#000'},
-  foodQtyPrice: {fontSize: 14, fontWeight: '600', color: '#8e8b8bff'},
+  itemImage: { width: 55, height: 55, borderRadius: 8 },
+  itemName: { fontSize: 14, fontWeight: '600', color: '#000' },
+  foodQtyPrice: { fontSize: 14, fontWeight: '600', color: '#8e8b8bff' },
   noteTag: {
     marginTop: 6,
     backgroundColor: '#FFF6E5',
@@ -784,22 +873,22 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     width: width * 0.55,
   },
-  noteText: {fontSize: width * 0.035, color: '#444'},
-  itemPrice: {fontSize: 13, color: '#444'},
+  noteText: { fontSize: width * 0.035, color: '#444' },
+  itemPrice: { fontSize: 13, color: '#444' },
   billRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 4,
   },
-  billLabel: {fontSize: 13, color: '#555'},
-  billValue: {fontSize: 13, color: '#555'},
+  billLabel: { fontSize: 13, color: '#555' },
+  billValue: { fontSize: 13, color: '#555' },
   divider: {
     borderBottomWidth: 0.7,
     borderBottomColor: '#ccc',
     marginVertical: 6,
   },
-  totalLabel: {fontSize: 15, fontWeight: '700'},
-  totalValue: {fontSize: 15, fontWeight: '700', color: 'red'},
+  totalLabel: { fontSize: 15, fontWeight: '700' },
+  totalValue: { fontSize: 15, fontWeight: '700', color: 'red' },
   bottomBar: {
     position: 'absolute',
     bottom: 26,
@@ -811,14 +900,14 @@ const styles = StyleSheet.create({
     width: '100%',
     elevation: 5,
   },
-  bottomTotal: {fontSize: 16, fontWeight: '700', color: 'black'},
+  bottomTotal: { fontSize: 16, fontWeight: '700', color: 'black' },
   continueBtn: {
     backgroundColor: 'red',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 10,
   },
-  continueText: {color: '#fff', fontWeight: '700', fontSize: 14},
+  continueText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
   savemodalView: {
     position: 'absolute', // Make it absolute to position relative to screen
@@ -838,14 +927,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  modalTitle: {fontSize: 16, fontWeight: '700', color: '#000'},
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#000' },
   locationContainer: {
     padding: 12,
     backgroundColor: '#FFECEC',
     borderRadius: 8,
     marginVertical: 12,
   },
-  locationText: {color: 'red', fontWeight: '600', fontSize: 14},
+  locationText: { color: 'red', fontWeight: '600', fontSize: 14 },
 
   addressItem: {
     flexDirection: 'row',
@@ -856,9 +945,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     elevation: 1,
   },
-  addressType: {fontWeight: '700', color: '#000'},
-  addressText: {color: '#555'},
-  nameText: {color: '#000', marginTop: 4},
+  addressType: { fontWeight: '700', color: '#000' },
+  addressText: { color: '#555' },
+  nameText: { color: '#000', marginTop: 4 },
 
   modalOverlay: {
     flex: 1,
@@ -873,7 +962,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  modalText: {fontSize: 14, color: '#555', marginVertical: 10},
+  modalText: { fontSize: 14, color: '#555', marginVertical: 10 },
   modalBtn: {
     backgroundColor: 'red',
     paddingVertical: 10,
@@ -881,5 +970,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 10,
   },
-  modalBtnText: {color: '#fff', fontSize: 14, fontWeight: '600'},
+  modalBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
 });

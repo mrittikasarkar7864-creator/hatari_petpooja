@@ -6,15 +6,18 @@ import { API } from '../../global_Url/GlobalUrl';
 export const postBilling = createAsyncThunk(
   'billing/postBilling',
   async (billingData, { rejectWithValue }) => {
-    console.log(billingData,"------------billingData666666666666666666");
-    
+    console.log('POST BILLING REQUEST:', billingData);
+
     try {
       const response = await axiosInstance.post(API.billing, billingData);
-      console.log(response,"----------------------responsebiling55558888");
-      
+      console.log('POST BILLING RESPONSE:', response.data);
+
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Something went wrong');
+      console.log('POST BILLING ERROR:', error?.response?.data || error?.message || error);
+      return rejectWithValue(
+        error.response?.data || error.message || 'Something went wrong',
+      );
     }
   }
 );
