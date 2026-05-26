@@ -26,6 +26,7 @@ import {fetchDeliverySettings} from '../redux/slice/deliverySettingsSlice';
 import {fetchCoupons} from '../redux/slice/couponSlice';
 import {postBilling} from '../redux/slice/postBillingSlice';
 import {fetchUserAddresses} from '../redux/slice/saveaddressSlice';
+import {fetchPetpoojaCartCalculate} from '../redux/slice/CartPetpoojaSlice';
 import {deleteUserAddress} from '../redux/slice/AddressDeleteSlice';
 import CustomHeader from '../components/CustomHeader';
 import {calculateTotalPackingCharge} from '../utils/packingChargesConfig';
@@ -40,12 +41,16 @@ const OrderSummaryScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
-  const {selectedRestaurant, experienceType} = useSelector(
+  const {selectedRestaurant, experienceType, experienceId} = useSelector(
     state => state.experience,
   );
   const {addresses, loading} = useSelector(state => state.address);
   const {items: cartItems} = useSelector(state => state.cart);
   console.log(cartItems,"-------------------cartItems");
+  const cartData = useSelector(state => state.cartPetpooja);
+  console.log(cartData,"-------------------cartData");
+  
+  const calculatedCart = useSelector(state => state.cartPetpooja.calculatedCart);
   
 
   const {token} = useSelector(state => state.auth);
@@ -54,7 +59,30 @@ const OrderSummaryScreen = () => {
   
   const couponState = useSelector(state => state.coupons);
 
-  const couponList = couponState?.list?.data || [];
+
+
+  const rawCouponList = Array.isArray(couponState?.list)
+    ? couponState.list
+    : couponState?.list?.data || [];
+
+  const normalizeCoupon = c => ({
+    ...c,
+    description: c.description || c.discountName || '',
+    minOrderAmount: c.minAmount ?? c.minOrderAmount ?? 0,
+    discountDisplay:
+      c.discountDisplay ||
+      (c.discountType == '1' ? `${c.discountValue}%` : `₹${c.discountValue}`),
+    code: c.couponCode || c.code || null,
+    discountType:
+      c.discountType === 'percentage' || c.discountType === '1' || c.discountType === 1
+        ? 'percentage'
+        : 'fixed',
+    discountValue: c.discountValue ?? 0,
+  });
+
+  const couponList = (rawCouponList || []).map(normalizeCoupon);
+  console.log(couponList, '------------------couponList---------------------');
+  
 
   const [savedAddress, setSavedAddress] = useState(null);
   console.log(savedAddress,"------------------------savedAddress");
@@ -65,10 +93,19 @@ const OrderSummaryScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [localAddresses, setLocalAddresses] = useState([]);
 
+    const restaurantList = useSelector(state => state.restaurants.list || []);
+    console.log(restaurantList,"restaurantList");
+  
+    const getRestaurantId = restaurant =>
+      restaurant?.restaurantId ?? restaurant?._id ?? restaurant?.id;
+  
+    const selectedRestaurantId = getRestaurantId(selectedRestaurant);
+    console.log(selectedRestaurantId,"---id--");
+
   // Fetch delivery settings, coupons, and addresses
   useEffect(() => {
     dispatch(fetchDeliverySettings());
-    dispatch(fetchCoupons());
+    dispatch(fetchCoupons({ restaurantId: selectedRestaurantId }));
     dispatch(fetchUserAddresses(token));
   }, []);
 
@@ -86,6 +123,25 @@ const OrderSummaryScreen = () => {
     load();
     setLocalAddresses(addresses);
   }, [addresses]);
+
+  // Recalculate petpooja cart when address or cart changes
+  useEffect(() => {
+    const lat =
+      savedAddress?.latitude || savedAddress?.lat || savedAddress?.customerLatitude ;
+    const lng =
+      savedAddress?.longitude || savedAddress?.lng || savedAddress?.customerLongitude;
+      console.log(lat, lng,"-------------------latlng for cart calculate---------------------");
+
+    // dispatch only if we have cart items or address
+    if ((cartItems && cartItems.length > 0) || savedAddress) {
+      dispatch(
+        fetchPetpoojaCartCalculate({
+          customerLatitude: String(lat),
+          customerLongitude: String(lng),
+        }),
+      );
+    }
+  }, [savedAddress, cartItems]);
 
   // Load user ID
   useEffect(() => {
@@ -131,19 +187,33 @@ const OrderSummaryScreen = () => {
     return (price + addonsTotal) * (Number(item.quantity) || 1);
   };
 
-  const itemTotal = cartItems.reduce(
-    (sum, item) => sum + getItemTotal(item),
-    0,
-  );
+  // Support petpooja calculated cart response if available
+  const displayItems = calculatedCart?.cart?.items || cartItems || [];
+
+  const getDisplayItemTotal = item => {
+    // Petpooja item shape: price / final_price and quantity as strings
+    if (item && (item.price || item.final_price)) {
+      const unit = Number(item.final_price ?? item.price ?? 0);
+      const qty = Number(item.quantity ?? 1);
+      return unit * qty;
+    }
+
+    return getItemTotal(item);
+  };
+
+  const itemTotal =
+    Number(calculatedCart?.cart?.totals?.itemSubtotal) ||
+    displayItems.reduce((sum, item) => sum + getDisplayItemTotal(item), 0);
+
   console.log(itemTotal, '------------------totalAmount---------------------');
 
   // Calculate packing fee:
   // - Top 22 items (whitelist) = NO packing charge
   // - All other API items = Apply packing_charge_per_item from backend settings
-  const packingFee = calculateTotalPackingCharge(
-    cartItems,
-    data?.packing_charge_per_item || 0,
-  );
+  // Prefer packagingCharge from calculated cart totals when available
+  const packingFee =
+    Number(calculatedCart?.cart?.totals?.packagingCharge) ||
+    calculateTotalPackingCharge(cartItems, data?.packing_charge_per_item || 0);
   
   console.log('🛵 PACKING FEE CALCULATION:');
   console.log('   Packing Charge Per Item (from API):', data?.packing_charge_per_item || 0);
@@ -161,8 +231,19 @@ const OrderSummaryScreen = () => {
     if (itemTotal < selectedCoupon.minOrderAmount) discount = 0;
   }
 
-  const cgstAmt = data?.Cgst ? (itemTotal + packingFee) * parseFloat(data.Cgst) / 100 : 0;
-  const sgstAmt = data?.Sgst ? (itemTotal  + packingFee) * parseFloat(data.Sgst) / 100 : 0;
+  // Prefer tax breakdown from calculated cart when present
+  const findTax = title => {
+    const tax = (calculatedCart?.cart?.taxes || []).find(t => t.title === title || t.name === title);
+    return tax ? Number(tax.tax || tax.amount || 0) : 0;
+  };
+
+  const cgstAmt =
+    Number(calculatedCart?.cart?.taxes?.find(t => t.title === 'CGST' || t.name === 'CGST')?.tax) ||
+    (data?.Cgst ? (itemTotal + packingFee) * parseFloat(data.Cgst) / 100 : 0);
+
+  const sgstAmt =
+    Number(calculatedCart?.cart?.taxes?.find(t => t.title === 'SGST' || t.name === 'SGST')?.tax) ||
+    (data?.Sgst ? (itemTotal + packingFee) * parseFloat(data.Sgst) / 100 : 0);
 
   let convenienceAmt = 0;
   if (data?.convenience_charges_type === 'percentage') {
@@ -171,14 +252,10 @@ const OrderSummaryScreen = () => {
     convenienceAmt = data.convenience_charges_value || 0;
   }
 
+  // Prefer grand total from calculated cart totals when available
   const grandTotal =
-    itemTotal +
-    (data?.delivery_charges_value || 0) +
-    packingFee +
-    cgstAmt +
-    sgstAmt +
-    convenienceAmt -
-    discount; // remove cgstAmt/sgstAmt if backend applies them
+    Number(calculatedCart?.cart?.totals?.total) ||
+    (itemTotal + (data?.delivery_charges_value || 0) + packingFee + cgstAmt + sgstAmt + convenienceAmt - discount);
 
   console.log(grandTotal, '------------------grandTotal---------------------');
 
@@ -375,37 +452,44 @@ const OrderSummaryScreen = () => {
           {/* CART ITEMS */}
           <View style={styles.sectionBox}>
             <Text style={styles.sectionTitle}>Your Items</Text>
-            {cartItems.map(item => (
-              <View key={item._id} style={styles.itemRow}>
-                <Image source={{uri: item.image}} style={styles.itemImage} />
-                <View style={{flex: 1, marginLeft: 10}}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.foodQtyPrice}>Qty: {item.quantity}</Text>
-                  <View style={{flexDirection: 'row'}}>
-                  <Text style={styles.itemPrice}>
-  {formatCurrency(getItemTotal(item))}{' '}
-  {item.selectedOption
-    ? `(${item.selectedOption.charAt(0).toUpperCase()}${item.selectedOption.slice(1)})`
-    : ''}
-</Text>
+            {(displayItems || []).map((item, idx) => {
+              const key = item._id || item.id || item.itemId || idx;
+              const qty = item.quantity ? Number(item.quantity) : 1;
+              const unitPrice = Number(item.final_price ?? item.price ?? item.unitPrice ?? 0);
+              const lineTotal = getDisplayItemTotal(item);
 
-                 
-                  </View>
-                  {item.selectedAddOns?.length > 0 && (
-                    <Text style={{color: '#555', fontSize: 13}}>
-                      {item.selectedAddOns
-                        .map(a => `${a.name} (+₹${a.price})`)
-                        .join(', ')}
-                    </Text>
-                  )}
-                  {item.note && (
-                    <View style={styles.noteTag}>
-                      <Text style={styles.noteText}>📝 {item.note}</Text>
+              return (
+                <View key={key} style={styles.itemRow}>
+                  <Image source={{uri: item.image || item.imageUrl || ''}} style={styles.itemImage} />
+                  <View style={{flex: 1, marginLeft: 10}}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.foodQtyPrice}>Qty: {qty}</Text>
+                    <View style={{flexDirection: 'row'}}>
+                      <Text style={styles.itemPrice}>
+                        {formatCurrency(lineTotal)}{' '}
+                        {item.variation_name || item.selectedOption
+                          ? `(${(item.selectedOption || item.variation_name || '').toString().charAt(0).toUpperCase()}${(item.selectedOption || item.variation_name || '').toString().slice(1)})`
+                          : ''}
+                      </Text>
                     </View>
-                  )}
+
+                    {item.AddonItem?.details?.length > 0 || item.selectedAddOns?.length > 0 ? (
+                      <Text style={{color: '#555', fontSize: 13}}>
+                        {(item.AddonItem?.details || item.selectedAddOns || [])
+                          .map(a => `${a.name} (+₹${a.price ?? a.amount ?? 0})`)
+                          .join(', ')}
+                      </Text>
+                    ) : null}
+
+                    {item.note && (
+                      <View style={styles.noteTag}>
+                        <Text style={styles.noteText}>📝 {item.note}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {/* BILL DETAILS */}
@@ -430,24 +514,37 @@ const OrderSummaryScreen = () => {
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Delivery Fee</Text>
               <Text style={styles.billLabel}>
-                {formatCurrency(data?.delivery_charges_value || 0)}
+                {formatCurrency(Number(calculatedCart?.cart?.totals?.deliveryCharges) || data?.delivery_charges_value || 0)}
               </Text>
             </View>
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>Packing Fee</Text>
               <Text style={styles.billLabel}>{formatCurrency(packingFee)}</Text>
             </View>
-            {data?.Cgst && (
-              <View style={styles.billRow}>
-                <Text style={styles.billLabel}>CGST ({data.Cgst}%)</Text>
-                <Text style={styles.billLabel}>{formatCurrency(cgstAmt)}</Text>
-              </View>
-            )}
-            {data?.Sgst && (
-              <View style={styles.billRow}>
-                <Text style={styles.billLabel}>SGST ({data.Sgst}%)</Text>
-                <Text style={styles.billLabel}>{formatCurrency(sgstAmt)}</Text>
-              </View>
+
+            {/* Render tax rows from calculatedCart if available, else fall back to CGST/SGST from settings */}
+            {(calculatedCart?.cart?.taxes || []).length > 0 ? (
+              calculatedCart.cart.taxes.map(t => (
+                <View style={styles.billRow} key={t.id}>
+                  <Text style={styles.billLabel}>{t.title || t.name}</Text>
+                  <Text style={styles.billLabel}>{formatCurrency(Number(t.tax || t.amount || 0))}</Text>
+                </View>
+              ))
+            ) : (
+              <>
+                {data?.Cgst && (
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>CGST ({data.Cgst}%)</Text>
+                    <Text style={styles.billLabel}>{formatCurrency(cgstAmt)}</Text>
+                  </View>
+                )}
+                {data?.Sgst && (
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>SGST ({data.Sgst}%)</Text>
+                    <Text style={styles.billLabel}>{formatCurrency(sgstAmt)}</Text>
+                  </View>
+                )}
+              </>
             )}
             {selectedCoupon && (
               <View style={styles.billRow}>

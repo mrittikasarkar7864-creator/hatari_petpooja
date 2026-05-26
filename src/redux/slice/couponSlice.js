@@ -6,14 +6,15 @@ import { API } from '../../global_Url/GlobalUrl';
 // Async thunk to fetch coupons from an API
 export const fetchCoupons = createAsyncThunk(
   'coupons/fetchCoupons',
-  async (_, { rejectWithValue }) => {
+  async (payload, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.get(API.coupon); // Replace with your API
-      console.log(response,"----------------------response");
-      
-      return response.data;
+      const restaurantId = payload && payload.restaurantId ? payload.restaurantId : payload;
+      const response = await axiosInstance.get(API.coupon, { params: { restaurantId } });
+      const discounts = response && response.data && response.data.discounts ? response.data.discounts : (response && response.data ? response.data : []);
+      console.log(discounts, "----------------------responsecoupon");
+      return discounts;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(error?.response?.data || error.message || 'Fetch coupons failed');
     }
   }
 );
@@ -45,7 +46,9 @@ const couponSlice = createSlice({
       })
       .addCase(fetchCoupons.fulfilled, (state, action) => {
         state.loading = false;
-        state.list = action.payload;
+        state.list = Array.isArray(action.payload)
+          ? action.payload
+          : (action.payload && action.payload.discounts) || [];
       })
       .addCase(fetchCoupons.rejected, (state, action) => {
         state.loading = false;
