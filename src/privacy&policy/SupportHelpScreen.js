@@ -51,17 +51,20 @@ export default function SupportHelpScreen() {
 
   const [activeIndex, setActiveIndex] = useState(null);
 
-const selectedRestaurant = useSelector(
-  state => state.experience.selectedRestaurant
+
+const restaurantList = useSelector(
+  state => state.restaurants?.list || [],
 );
+
+const selectedRestaurant = restaurantList?.[0] || {};
 
 console.log(selectedRestaurant, "------Support------");
 
 const supportNumber =
-  selectedRestaurant?.supportContact?.mobileNumber || "0000000000";
+  selectedRestaurant?.contact || "0000000000";
 
 const managerName =
-  selectedRestaurant?.supportContact?.managerName || "Hatari Support";
+  selectedRestaurant?.name || "Hatari Support";
 
 
   const toggleFAQ = (index) => {

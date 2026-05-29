@@ -1,6 +1,6 @@
 // redux/slice/bannerSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { API } from "../../global_Url/GlobalUrl";
+import { API, petpooja_url } from "../../global_Url/GlobalUrl";
 import axiosInstance from "../../global_Url/axiosInstance";
 
 
@@ -10,7 +10,41 @@ export const fetchBanners = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await axiosInstance.get(API.getbannerHome);
-      return response.data; // Assuming API returns an array of banners
+      console.log(response, "----------response banner");
+
+      const data = response?.data;
+      console.log(data, "----------data banner");
+      
+      let banners = [];
+
+      if (Array.isArray(data)) {
+        banners = data;
+      } else if (Array.isArray(data?.data)) {
+        banners = data.data;
+      } else if (Array.isArray(data?.banners)) {
+        banners = data.banners;
+      } else if (Array.isArray(data?.bannerList)) {
+        banners = data.bannerList;
+      } else if (data) {
+        banners = [data];
+      }
+
+      const baseImageUrl = petpooja_url.replace(/\/api\/?$/i, '');
+      const normalizedBanners = banners.map((banner) => {
+        const imageUrl = banner?.imageUrl || banner?.image || banner?.bannerImage || '';
+        const fullImageUrl = imageUrl
+          ? imageUrl.startsWith('http')
+            ? imageUrl
+            : `${baseImageUrl}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`
+          : '';
+
+        return {
+          ...banner,
+          fullImageUrl,
+        };
+      });
+
+      return normalizedBanners;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

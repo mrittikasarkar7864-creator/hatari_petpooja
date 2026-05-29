@@ -268,7 +268,7 @@ const HomeScreen = () => {
                     colors={['#fce3ec', '#f8f8f8']}
                     style={styles.bannerCard}>
                     <Image
-                      source={{ uri: banner?.fullImageUrl }}
+                      source={{ uri: banner?.fullImageUrl || banner?.imageUrl || banner?.image }}
                       style={styles.bannerImage}
                       resizeMode="cover"
                     />

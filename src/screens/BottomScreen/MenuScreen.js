@@ -62,6 +62,8 @@ const CatItemScreen = () => {
     hasMore,
   } = useSelector(state => state.FoodPagination);
 
+
+
   const cartItems = useSelector(state => state.cart.items || []);
 
   const selectedRestaurant = useSelector(
@@ -431,7 +433,7 @@ const CatItemScreen = () => {
 
 const renderItem = ({item}) => {
   const dataItem = item?.food || item;
-
+ 
   console.log(dataItem, '-----------------------dataitem');
 
   const isFoodAvailable =
@@ -775,6 +777,14 @@ const renderItem = ({item}) => {
                               }>
                               {selectedFood.name}
                             </Text>
+                               <Text
+                              style={
+                                styles.modalFoodName
+                              }>
+                              {selectedFood.description}
+                            </Text>
+
+                         
                           </View>
                         </View>
 

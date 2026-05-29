@@ -9,6 +9,7 @@ import {
   Image,
   TouchableOpacity,
   BackHandler,
+  Dimensions,
 } from 'react-native';
 
 import {useDispatch, useSelector} from 'react-redux';
@@ -26,7 +27,7 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import Theme from '../assets/theme';
-
+const { width } = Dimensions.get('window');
 const ItemDetalis = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -36,6 +37,8 @@ const ItemDetalis = () => {
   );
 
   const orderData = Array.isArray(orders) ? orders : [];
+  console.log(orderData,"-----------------orderData in order screen");
+  
 
   /* ================= BACK HANDLER ================= */
 
@@ -180,7 +183,7 @@ const ItemDetalis = () => {
                   <View style={styles.restaurantLeft}>
                     <Image
                       source={{
-                        uri: 'https://cdn-icons-png.flaticon.com/512/2921/2921820.png',
+                        uri: 'src/assets/images/project_logo.png',
                       }}
                       style={styles.restaurantImage}
                     />
@@ -254,7 +257,7 @@ const ItemDetalis = () => {
 
                         <Image
                           source={{
-                            uri: 'https://cdn-icons-png.flaticon.com/512/1046/1046784.png',
+                            uri: 'src/assets/images/project_logo.png',
                           }}
                           style={styles.foodImage}
                         />
@@ -265,6 +268,13 @@ const ItemDetalis = () => {
                             style={styles.foodName}>
                             {food?.name}
                           </Text>
+                            {food?.customization || food?.note ? (
+                            <View style={styles.noteTag}>
+                              <Text style={styles.noteText}>
+                                📝 {food.customization || food.note}
+                              </Text>
+                            </View>
+                          ) : null}
 
                           <Text
                             style={styles.foodMeta}>
@@ -548,6 +558,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#222',
   },
+    noteTag: {
+    marginTop: 6,
+    backgroundColor: '#FFF6E5',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9800',
+    padding: 6,
+    borderRadius: 6,
+    width: width * 0.3,
+  },
+  noteText: { fontSize: width * 0.035, color: '#444' },
 
   foodMeta: {
     marginTop: 6,
@@ -673,4 +693,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+
 });

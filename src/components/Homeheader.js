@@ -44,6 +44,8 @@ const HomeHeader = () => {
   const restaurantList = useSelector(
     state => state.restaurants?.list || [],
   );
+  console.log(restaurantList,"------restaurantList------");
+  
 
 const {
   cartData = [],

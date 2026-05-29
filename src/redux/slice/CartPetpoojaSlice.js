@@ -89,6 +89,9 @@ export const updatePetpoojaCart = createAsyncThunk(
           addons: normalizeAddons(
             cartItem?.selectedAddOns || cartItem?.addons,
           ),
+
+          customization:
+            cartItem?.customization || cartItem?.note || '',
         },
       };
 
@@ -98,7 +101,7 @@ export const updatePetpoojaCart = createAsyncThunk(
       );
 
       const response = await axiosInstance.post(
-        API.postPetpoojaCartUpdate,
+        API.postCatAdd,
         payload,
       );
 
@@ -111,6 +114,66 @@ export const updatePetpoojaCart = createAsyncThunk(
     } catch (error) {
       console.log(
         'UPDATE CART ERROR ====>>',
+        error?.response?.data || error.message,
+      );
+
+      return rejectWithValue(
+        error?.response?.data || error.message,
+      );
+    }
+  },
+);
+
+// ==========================================
+// ADD ITEM TO CART
+// ==========================================
+
+export const addItemToPetpoojaCart = createAsyncThunk(
+  'cartPetpooja/addItem',
+  async (
+    {restaurantId, cartItem},
+    {rejectWithValue},
+  ) => {
+    try {
+      if (!restaurantId) {
+        return rejectWithValue('Restaurant ID is required');
+      }
+
+      if (!cartItem) {
+        return rejectWithValue('Cart item is required');
+      }
+
+      const itemId = resolveItemId(cartItem);
+
+      if (!itemId) {
+        return rejectWithValue('Valid item ID is required');
+      }
+
+      const payload = {
+        restaurantId,
+        item: {
+          itemId: String(itemId),
+          variationId: cartItem?.variationId || '',
+          quantity: Number(cartItem?.quantity || 1),
+          addons: normalizeAddons(
+            cartItem?.selectedAddOns || cartItem?.addons,
+          ),
+        },
+      };
+
+      console.log('ADD ITEM PAYLOAD ====>>', payload);
+
+      const response = await axiosInstance.post(
+        API.postCatAdd,
+        payload,
+      );
+
+      console.log('ADD ITEM RESPONSE ====>>', response.data);
+
+      return response.data;
+    } catch (error) {
+      console.log(
+        'ADD ITEM ERROR ====>>',
         error?.response?.data || error.message,
       );
 
@@ -333,6 +396,35 @@ const CartPetpoojaSlice = createSlice({
 
           state.error = action.payload;
 
+          state.success = false;
+        },
+      );
+
+    // ==========================================
+    // ADD ITEM TO CART
+    // ==========================================
+
+    builder
+      .addCase(
+        addItemToPetpoojaCart.pending,
+        state => {
+          state.syncing = true;
+          state.error = null;
+        },
+      )
+      .addCase(
+        addItemToPetpoojaCart.fulfilled,
+        (state, action) => {
+          state.syncing = false;
+          state.cartData = action.payload?.cart || state.cartData;
+          state.success = true;
+        },
+      )
+      .addCase(
+        addItemToPetpoojaCart.rejected,
+        (state, action) => {
+          state.syncing = false;
+          state.error = action.payload;
           state.success = false;
         },
       );

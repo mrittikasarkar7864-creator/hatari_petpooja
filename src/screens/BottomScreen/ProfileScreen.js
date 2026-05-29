@@ -65,7 +65,7 @@ const ProfileScreen = ({navigation}) => {
             <Image
               source={{
                 uri:
-                  userData?.data?.image ||
+                  userdata?.image ||
                   'https://cdn-icons-png.flaticon.com/512/149/149071.png',
               }}
               style={styles.profileImage}

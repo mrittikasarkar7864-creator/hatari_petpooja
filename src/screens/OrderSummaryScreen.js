@@ -19,7 +19,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, StackActions } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import DashboardScreen from '../components/DashboardScreen';
 import { clearCart } from '../redux/slice/cartSlice';
@@ -167,6 +167,21 @@ const OrderSummaryScreen = () => {
     }
   };
 
+  // Cross-platform toast helper: uses Android Toast where available, falls back to Alert on other platforms
+  const showToast = (message, duration = ToastAndroid?.SHORT) => {
+    try {
+      if (Platform.OS === 'android' && ToastAndroid && ToastAndroid.show) {
+        ToastAndroid.show(String(message), duration);
+      } else {
+        // For iOS / web use Alert to show a simple message
+        Alert.alert('', String(message));
+      }
+    } catch (err) {
+      // Last resort fallback
+      console.log('Toast fallback:', message);
+    }
+  };
+
   const getItemTotal = item => {
     let price = 0;
     if (item.hasVariation) {
@@ -281,14 +296,11 @@ const OrderSummaryScreen = () => {
 
   const applyCoupon = coupon => {
     if (itemTotal < coupon.minOrderAmount) {
-      ToastAndroid.show(
-        `Min order ₹${coupon.minOrderAmount} required`,
-        ToastAndroid.SHORT,
-      );
+      showToast(`Min order ₹${coupon.minOrderAmount} required`, ToastAndroid.SHORT);
       return;
     }
     setSelectedCoupon(coupon);
-    ToastAndroid.show(`${coupon.code} applied`, ToastAndroid.SHORT);
+    showToast(`${coupon.code} applied`, ToastAndroid.SHORT);
   };
 
   const handleProceed = () => {
@@ -297,13 +309,13 @@ const OrderSummaryScreen = () => {
       return;
     }
 
-    if (itemTotal < 500) {
-      ToastAndroid.show('Minimum order amount is ₹500', ToastAndroid.SHORT);
+    if (itemTotal < 749) {
+      showToast('Minimum order amount is ₹749', ToastAndroid.SHORT);
       return;
     }
 
     if (!savedAddress) {
-      ToastAndroid.show('Add a delivery address.', ToastAndroid.SHORT);
+      showToast('Add a delivery address.', ToastAndroid.SHORT);
       return;
     }
 
@@ -337,13 +349,16 @@ const OrderSummaryScreen = () => {
       longitude: customerLongitude,
       label: savedAddress?.addressType || 'Home',
       mobileNumber: savedAddress?.mobileNumber || savedAddress?.contact || '7864512300',
+      customization: '',
     };
+
 
     const petpoojaItems = (displayItems || []).map(item => ({
       itemId: String(getItemId(item)),
       variationId: String(getVariationId(item)),
       quantity: Number(item.quantity || 1),
-      note: item?.note || '',
+      note: item?.note || item?.customization || '',
+      customization: item?.customization || item?.note || '',
       addons: (item.selectedAddOns || item.addons || item.AddonItem?.details || []).map(add => ({
         addonItemId: String(add.addonItemId || add.id || add._id || ''),
         quantity: Number(add.quantity || add.qty || 1),
@@ -354,7 +369,7 @@ const OrderSummaryScreen = () => {
       foodId: item.id || item.foodId || item._id || '',
       quantity: Number(item.quantity || 1),
       variant: item.hasVariation ? item.selectedOption : null,
-      note: item?.note || '',
+      note: item?.note || item?.customization || '',
       fullPrice:
         item.hasVariation && item.selectedOption === 'full'
           ? Number(item.priceInfo?.fullPrice || 0)
@@ -409,15 +424,55 @@ const OrderSummaryScreen = () => {
       dispatch(clearCart());
       setCodModalVisible(false);
 
-      ToastAndroid.show('Order placed successfully!', ToastAndroid.LONG);
-      navigation.navigate('OrderSuccessScreen');
+      console.log('BILLING SUCCESS');
+      showToast('Order placed successfully!', ToastAndroid.LONG);
+
+      // DEBUG: log navigation state
+      try {
+        if (navigation && navigation.getState) {
+          console.log('NAV STATE BEFORE RESET:', navigation.getState());
+        } else {
+          console.log('NAV OBJECT:', navigation);
+        }
+      } catch (navErr) {
+        console.log('NAV DEBUG ERROR', navErr);
+      }
+
+      // Delay slightly to allow modal state to settle, then reset navigation.
+      setTimeout(() => {
+        try {
+          console.log('ATTEMPT NAV RESET');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'OrderSuccessScreen' }],
+          });
+          console.log('NAV RESET CALLED');
+
+          // final fallback after another short delay: replace current route
+          setTimeout(() => {
+            try {
+              console.log('ATTEMPT REPLACE FALLBACK');
+              navigation.dispatch(StackActions.replace('OrderSuccessScreen'));
+            } catch (replaceErr) {
+              console.log('REPLACE FALLBACK FAILED', replaceErr);
+            }
+          }, 300);
+        } catch (err) {
+          console.log('Reset navigation failed', err);
+          try {
+            navigation.dispatch(StackActions.replace('OrderSuccessScreen'));
+          } catch (replaceErr) {
+            console.log('Replace fallback failed', replaceErr);
+          }
+        }
+      }, 250);
     } catch (e) {
       console.log('Order confirmation failed:', e);
       const errorMessage =
         typeof e === 'string'
           ? e
           : e?.message || e?.payload || 'Order failed. Try again.';
-      ToastAndroid.show(errorMessage, ToastAndroid.SHORT);
+      showToast(errorMessage, ToastAndroid.SHORT);
     }
   };
 
@@ -435,9 +490,9 @@ const OrderSummaryScreen = () => {
               setSavedAddress(null);
               await AsyncStorage.removeItem('savedAddress');
             }
-            ToastAndroid.show('Address deleted', ToastAndroid.SHORT);
+            showToast('Address deleted', ToastAndroid.SHORT);
           } catch (error) {
-            ToastAndroid.show('Failed to delete address', ToastAndroid.SHORT);
+            showToast('Failed to delete address', ToastAndroid.SHORT);
           }
         },
       },
@@ -574,9 +629,9 @@ const OrderSummaryScreen = () => {
                       </Text>
                     ) : null}
 
-                    {item.note && (
+                    {item.customization && (
                       <View style={styles.noteTag}>
-                        <Text style={styles.noteText}>📝 {item.note}</Text>
+                        <Text style={styles.noteText}>📝 {item.customization}</Text>
                       </View>
                     )}
                   </View>
@@ -716,12 +771,12 @@ const OrderSummaryScreen = () => {
                           ToastAndroid.SHORT,
                         );
                       }}>
-                      <Text style={styles.addressType}>{item.addressType}</Text>
+                      <Text style={styles.addressType}>{item.state}</Text>
                       <Text style={styles.addressText}>
-                        {item.flat}, {item.address}
+                        {item.city}, {item.addressLine}
                       </Text>
                       <Text style={styles.nameText}>
-                        {item.name} - {item.mobileNumber}
+                        {item.name} - {item.phone}
                       </Text>
                     </TouchableOpacity>
 
@@ -836,14 +891,11 @@ const styles = StyleSheet.create({
   couponCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 14,
     borderRadius: 10,
     marginBottom: 8,
-    height: Platform.OS === 'android'
-      ? Math.max(78, width - 400) // Android slightly taller
-      : Math.max(130, width - 330),
-
-
+    minHeight: 90,
   },
   couponDesc: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
   couponDetails: { color: '#fff', fontSize: 12 },

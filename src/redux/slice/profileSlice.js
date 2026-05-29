@@ -35,12 +35,11 @@ const profileSlice = createSlice({
       .addCase(fetchUserProfile.pending, (state) => {
         state.loading = true;
       })
-   .addCase(fetchUserProfile.fulfilled, (state, action) => {
-  state.loading = false;
-  // Store the profile object directly
-  state.userData = action.payload?.profile || action.payload;
-})
-
+      .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userData =
+          action.payload?.user || action.payload?.profile || action.payload;
+      })
       .addCase(fetchUserProfile.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;

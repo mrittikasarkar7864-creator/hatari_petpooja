@@ -492,7 +492,7 @@ const HomeScreen = () => {
           : bannerlist  ?.filter(banner => banner.isActive)?.map((banner, i) => (
             <View key={i} style={styles.bannerCard}>
               <Image
-                source={{ uri: banner?.fullImageUrl }}
+                source={{ uri: banner?.fullImageUrl || banner?.imageUrl || banner?.image }}
                 style={styles.bannerImage}
                 resizeMode="stretch"
               />
@@ -514,7 +514,7 @@ const HomeScreen = () => {
 
       {/* Categories */}
       <SectionDivider title={categorySectionTitle} />
-      <Text style={styles.categorySubtitle}>{categorySectionSubtitle}</Text>
+      {/* <Text style={styles.categorySubtitle}>{categorySectionSubtitle}</Text> */}
       {foodPaginationLoading && displayCategories.length === 0 ? (
         <ScrollView
           horizontal

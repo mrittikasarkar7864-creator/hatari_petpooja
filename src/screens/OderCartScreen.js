@@ -3,7 +3,7 @@
 // PETPOOJA API BASED FULL CART SCREEN
 // ==========================================
 
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 
 import {
   View,
@@ -32,11 +32,11 @@ import {
   useFocusEffect,
 } from '@react-navigation/native';
 
-import {useDispatch, useSelector} from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import DashboardScreen from '../components/DashboardScreen';
 
@@ -50,7 +50,7 @@ import {
   fetchPetpoojaCart,
 } from '../redux/slice/CartPetpoojaSlice';
 
-const {width, height} = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const OderCartScreen = () => {
   const navigation = useNavigation();
@@ -69,8 +69,8 @@ const OderCartScreen = () => {
     syncing,
     error,
   } = useSelector(state => state.cartPetpooja);
-  console.log(cartData, fetchingCart, syncing, error,"----------------cartData, fetchingCart, syncing, error,");
-  
+  console.log(cartData, fetchingCart, syncing, error, "----------------cartData, fetchingCart, syncing, error,");
+
 
   // ==========================================
   // LOCAL STATES
@@ -115,8 +115,8 @@ const OderCartScreen = () => {
     const base =
       Number(
         item?.price ||
-          item?.unitPrice ||
-          item?.amount,
+        item?.unitPrice ||
+        item?.amount,
       ) || 0;
 
     const addons =
@@ -242,7 +242,7 @@ const OderCartScreen = () => {
   const openModal = item => {
     setSelectedItem(item);
 
-    setNoteText(item?.note || '');
+    setNoteText(item?.customization || item?.note || '');
   };
 
   const closeModal = () => {
@@ -251,20 +251,47 @@ const OderCartScreen = () => {
     setNoteText('');
   };
 
-  const handleSaveNote = () => {
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(
-        'Customization saved!',
-        ToastAndroid.SHORT,
-      );
-    } else {
-      Alert.alert(
-        'Success',
-        'Customization saved!',
-      );
+  const handleSaveNote = async () => {
+    if (!selectedItem) {
+      return;
     }
 
-    closeModal();
+    try {
+      await dispatch(
+        updatePetpoojaCart({
+          restaurantId,
+          cartItem: {
+            ...selectedItem,
+            itemId: getItemId(selectedItem),
+            variationId: getVariationId(selectedItem),
+            customization: noteText,
+          },
+        }),
+      ).unwrap();
+
+      dispatch(fetchPetpoojaCart());
+
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          'Customization saved!',
+          ToastAndroid.SHORT,
+        );
+      } else {
+        Alert.alert(
+          'Success',
+          'Customization saved!',
+        );
+      }
+
+      closeModal();
+    } catch (err) {
+      console.log('Customize save error:', err);
+
+      Alert.alert(
+        'Error',
+        'Unable to save customization. Please try again.',
+      );
+    }
   };
 
   // ==========================================
@@ -284,7 +311,7 @@ const OderCartScreen = () => {
   // RENDER ITEM
   // ==========================================
 
-  const renderItem = ({item}) => {
+  const renderItem = ({ item }) => {
     const isVeg =
       item?.type?.toLowerCase() === 'veg';
 
@@ -381,41 +408,46 @@ const OderCartScreen = () => {
 
           {/* NOTE */}
 
-          {item?.note ? (
-            <View style={styles.noteTag}>
+          {item?.customization ? (
+            <View style={styles.customizeSection}>
+              <Text style={styles.customizeLabel}>
+                Special instructions:
+              </Text>
+
               <Text style={styles.noteText}>
-                📝 {item.note}
+                📝 {item.customization}
               </Text>
             </View>
           ) : null}
         </View>
 
         {/* QUANTITY */}
+        <View style={styles.quantityWrapper}>
+          <View style={styles.quantityBox}>
+            <TouchableOpacity
+              style={styles.qtyBtn}
+              onPress={() =>
+                decrementQty(item)
+              }>
+              <Text style={styles.qtyText}>
+                -
+              </Text>
+            </TouchableOpacity>
 
-        <View style={styles.quantityBox}>
-          <TouchableOpacity
-            style={styles.qtyBtn}
-            onPress={() =>
-              decrementQty(item)
-            }>
-            <Text style={styles.qtyText}>
-              -
+            <Text style={styles.qtyValue}>
+              {item?.quantity || 1}
             </Text>
-          </TouchableOpacity>
 
-          <Text style={styles.qtyValue}>
-            {item?.quantity || 1}
-          </Text>
-
-          <TouchableOpacity
-            style={styles.qtyBtn}
-            onPress={() =>
-              incrementQty(item)
-            }>
-            <Text style={styles.qtyText}>
-              +
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.qtyBtn}
+              onPress={() =>
+                incrementQty(item)
+              }>
+              <Text style={styles.qtyText}>
+                +
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -430,9 +462,9 @@ const OderCartScreen = () => {
       <CustomHeader title="My Cart" />
 
       <DashboardScreen scrollable={false}>
-        <SafeAreaView style={{flex: 1}}>
+        <SafeAreaView style={{ flex: 1 }}>
           <KeyboardAvoidingView
-            style={{flex: 1}}
+            style={{ flex: 1 }}
             behavior={
               Platform.OS === 'ios'
                 ? 'padding'
@@ -461,7 +493,7 @@ const OderCartScreen = () => {
               </Text>
             </TouchableOpacity>
 
-       
+
 
             {/* LOADER */}
 
@@ -530,9 +562,8 @@ const OderCartScreen = () => {
                     item,
                     index,
                   ) =>
-                    `${
-                      item?.itemId ||
-                      item?.id
+                    `${item?.itemId ||
+                    item?.id
                     }-${index}`
                   }
                   renderItem={
@@ -614,22 +645,27 @@ const OderCartScreen = () => {
                 style={
                   styles.modalTitle
                 }>
-                Edit Item:{' '}
+                Customize Item:{' '}
                 {
                   selectedItem?.name
                 }
+              </Text>
+
+              <Text
+                style={
+                  styles.modalSubtitle
+                }>
+                Add a special instruction or preference.
               </Text>
 
               <TextInput
                 style={
                   styles.modalInput
                 }
-                placeholder="Enter note..."
+                placeholder="Enter customization details..."
                 placeholderTextColor="#999"
                 value={noteText}
-                onChangeText={
-                  setNoteText
-                }
+                onChangeText={setNoteText}
                 multiline
               />
 
@@ -771,8 +807,8 @@ const styles = StyleSheet.create({
   },
 
   itemName: {
-    marginLeft: 8,
-    fontSize: 15,
+    marginLeft: 5,
+    fontSize: 13,
     fontWeight: '700',
     color: '#333',
     flex: 1,
@@ -833,23 +869,42 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
 
+  customizeSection: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#fcf7f7',
+    borderColor: '#f1dfdf',
+    borderWidth: 1,
+  },
+
+  customizeLabel: {
+    fontSize: 12,
+    color: '#8f3740',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+
+  customizeHint: {
+    color: '#777',
+    fontSize: 12,
+  },
+
   noteText: {
-    color: '#444',
+    color: '#4a4a4a',
+    fontSize: 14,
+    lineHeight: 20,
+    flexShrink: 1,
   },
 
   quantityBox: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
 
+  },
+  quantityWrapper: { position: 'absolute', right: 12, top: 12, zIndex: 99, },
   qtyBtn: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 14,
-    elevation: 2,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 30, paddingHorizontal: 8, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 5, elevation: 5,
   },
 
   qtyText: {
@@ -908,6 +963,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
+    marginBottom: 8,
+  },
+
+  modalSubtitle: {
+    color: '#666',
+    fontSize: 14,
     marginBottom: 12,
   },
 

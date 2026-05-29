@@ -47,6 +47,8 @@ const HatariHome = ({route}) => {
   const restaurantsArray = list?.list || [];
   const bannerlist = useSelector(state => state.banners);
   const bannerlistBanner = bannerlist?.bannerlist || [];
+  console.log(bannerlistBanner, '---------------bannerlistBanner');
+  
   const AllFoodsData = useSelector(state => state.allFoods);
   console.log(AllFoodsData,"----------------AllFoodsData");
   
@@ -229,7 +231,7 @@ const HatariHome = ({route}) => {
             bannerlistBanner.map((banner, index) => (
               <Image
                 key={index}
-                source={{uri: banner?.fullImageUrl}}
+                source={{uri: banner?.fullImageUrl || banner?.imageUrl || banner?.image}}
                 style={styles.bannerImage}
                 resizeMode="cover"
               />
