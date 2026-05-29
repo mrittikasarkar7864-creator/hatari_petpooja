@@ -118,7 +118,7 @@ export default function ExperienceScreen() {
         );
       },
       {
-        enableHighAccuracy: true,
+        enableHighAccuracy: false,
         timeout: 20000,
         maximumAge: 0,
         forceRequestLocation: true,

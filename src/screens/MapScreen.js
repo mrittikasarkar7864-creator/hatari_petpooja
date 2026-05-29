@@ -91,6 +91,10 @@ const MapScreen = ({ navigation }) => {
     checkSavedAddress();
   }, []);
 
+  const closeSaveModal = () => {
+  setSaveModalVisible(false);
+};
+
   /** ================= LOCATION FLOW ================= **/
 
   const checkSavedAddress = async () => {
@@ -376,14 +380,16 @@ const MapScreen = ({ navigation }) => {
         )}
 
         {/* Save Address Modal */}
-        <SaveAddressModal
-          visible={saveModalVisible}
-          onRequestClose={() => setSaveModalVisible(false)}
-          location={location}
-          addressDetails={addressDetails}
-          latitude={location?.latitude}
-          longitude={location?.longitude}
-        />
+
+
+<SaveAddressModal
+  visible={saveModalVisible}
+  onRequestClose={closeSaveModal}
+  location={location}
+  addressDetails={addressDetails}
+  latitude={location?.latitude}
+  longitude={location?.longitude}
+/>
       </SafeAreaView>
     </DashboardScreen>
   );

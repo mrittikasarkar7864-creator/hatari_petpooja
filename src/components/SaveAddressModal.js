@@ -45,6 +45,8 @@ const SaveAddressModal = ({
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
+  
+
   const { data: deliveryData } = useSelector(
     (state) => state.deliverySettings
   );
@@ -134,14 +136,19 @@ const SaveAddressModal = ({
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardOpen(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardOpen(false));
+ const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardOpen(true));
+const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardOpen(false));
 
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
+return () => {
+  showSub.remove();
+  hideSub.remove();
+};
   }, []);
+  const handleClose = () => {
+  requestAnimationFrame(() => {
+    onRequestClose?.();
+  });
+};
 
   /* ---------------- Distance ---------------- */
   const getDistanceKm = (lat1, lon1, lat2, lon2) => {
@@ -294,11 +301,10 @@ const validateAndSave = async () => {
       statusBarTranslucent
       onRequestClose={onRequestClose}
     >
-      <KeyboardAvoidingView
-        style={styles.keyboardRoot}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? rh(2) : 0}
-      >
+    <KeyboardAvoidingView
+  style={{ flex: 1 }}
+  behavior={Platform.OS === "ios" ? "padding" : undefined}
+>
         <View
           style={[
             styles.modalContainer,
@@ -312,7 +318,7 @@ const validateAndSave = async () => {
               <Text style={styles.topAddress} numberOfLines={2}>
                 {location?.description || "No address selected"}
               </Text>
-              <TouchableOpacity onPress={onRequestClose}>
+              <TouchableOpacity onPress={handleClose}>
                 <Ionicons name="close" size={rf(3)} color="#333" />
               </TouchableOpacity>
             </View>

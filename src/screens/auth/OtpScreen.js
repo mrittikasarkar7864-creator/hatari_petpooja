@@ -173,7 +173,7 @@ const OtpScreen = ({ route, navigation }) => {
             source={require('../../assets/images/Cover/logo.png')}
             style={styles.logo}
           />
-          <Text style={styles.tagline}>Simmer</Text>
+          {/* <Text style={styles.tagline}>Simmer</Text> */}
 
           <Animated.View
             style={[
