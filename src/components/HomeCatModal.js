@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllCategories } from '../redux/slice/GetAllCategorySlice';
 import { useNavigation } from '@react-navigation/native';
-import { shouldIncludeByVegFilter } from '../utils/foodType';
 
 const HomeCatModal = ({ visible, onClose, cuisineType }) => {
   const dispatch = useDispatch();
@@ -44,7 +43,7 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
 
     if (item?.isActive === false) return false;
 
-    return shouldIncludeByVegFilter(item, isVeg);
+    return true;
   };
 
   // ✅ Final categories
@@ -60,9 +59,11 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
     if (isMenuGroup) return;
 
     const mainCategoryId =
-      cuisineType?._id ||
+      cuisineType?.parentId ||
+      cuisineType?.rawPayload?.id ||
       cuisineType?.categoryId ||
       cuisineType?.id ||
+      cuisineType?._id ||
       cuisineType?.parentCategoryId;
 
     const apiType = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
@@ -88,9 +89,10 @@ const HomeCatModal = ({ visible, onClose, cuisineType }) => {
 
     setTimeout(() => {
       const selectedCategoryId =
-        item?._id ||
         item?.categoryId ||
+        item?.rawPayload?.categoryid ||
         item?.id ||
+        item?._id ||
         item?.parentCategoryId ||
         item?.groupId;
 

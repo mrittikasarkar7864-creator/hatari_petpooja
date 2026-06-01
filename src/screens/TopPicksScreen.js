@@ -1,6 +1,6 @@
 // TopPicksScreen.js — Full Working Code With Your API Structure
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
   TouchableWithoutFeedback,
   Platform,
   RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -33,6 +34,8 @@ import {
   addItemToPetpoojaCart,
   fetchPetpoojaCart,
 } from "../redux/slice/CartApiSlice";
+import axiosInstance from "../global_Url/axiosInstance";
+import { API } from "../global_Url/GlobalUrl";
 
 const { width } = Dimensions.get("window");
 
@@ -41,17 +44,15 @@ const TopPicksScreen = () => {
   const route = useRoute();
   const dispatch = useDispatch();
 
-  const { categoryData, categoryName, title } = route.params || {};
+  const { categoryData, categoryName, title, id } = route.params || {};
   const selectedCategoryName = categoryName || title || "menu";
   const categoryItems = Array.isArray(categoryData?.items)
     ? categoryData.items
     : [];
+  const hasInlineItems = categoryItems.length > 0;
   const isVeg = useSelector((state) => state.foodFilter?.isVeg);
   const selectedRestaurant = useSelector(
     state => state.experience?.selectedRestaurant,
-  );
-  const filteredCategoryItems = categoryItems.filter(item =>
-    shouldIncludeByVegFilter(item, isVeg)
   );
 
   const getRestaurantId = restaurant =>
@@ -74,6 +75,67 @@ const TopPicksScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [bottomBoxVisible, setBottomBoxVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchedItems, setFetchedItems] = useState([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const restaurantId = getRestaurantId(selectedRestaurant);
+  const selectedCategoryId =
+    categoryData?.categoryId ||
+    categoryData?.rawPayload?.categoryid ||
+    categoryData?.id ||
+    id ||
+    categoryData?._id ||
+    "";
+
+  const selectedParentCategoryId =
+    categoryData?.parentId ||
+    categoryData?.rawPayload?.parent_category_id ||
+    categoryData?.parentCategoryId ||
+    "";
+
+  const loadCategoryItems = useCallback(async () => {
+    if (!restaurantId || !selectedCategoryId) {
+      setFetchedItems([]);
+      return;
+    }
+
+    try {
+      setLoadingItems(true);
+
+      const response = await axiosInstance.get(API.getfoodpagination, {
+        params: {
+          restaurantId,
+          parentCategoryId: selectedParentCategoryId,
+          categoryId: selectedCategoryId,
+          page: 1,
+          limit: 100,
+          search: "",
+        },
+      });
+
+      const items = Array.isArray(response?.data?.items)
+        ? response.data.items
+        : [];
+      setFetchedItems(items);
+    } catch (e) {
+      setFetchedItems([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  }, [restaurantId, selectedCategoryId, selectedParentCategoryId]);
+
+  useEffect(() => {
+    if (hasInlineItems) {
+      return;
+    }
+
+    loadCategoryItems();
+  }, [hasInlineItems, loadCategoryItems]);
+
+  const sourceItems = hasInlineItems ? categoryItems : fetchedItems;
+  const filteredCategoryItems = sourceItems.filter(item =>
+    shouldIncludeByVegFilter(item, isVeg)
+  );
 
   // Animation
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -201,12 +263,16 @@ const TopPicksScreen = () => {
   };
 
   // Refresh
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
 
-    setTimeout(() => {
+    try {
+      if (!hasInlineItems) {
+        await loadCategoryItems();
+      }
+    } finally {
       setRefreshing(false);
-    }, 1000);
+    }
   };
 
   // Render item
@@ -291,6 +357,9 @@ const TopPicksScreen = () => {
 
       <DashboardScreen scrollable={false}>
         <View style={styles.container}>
+          {loadingItems && !hasInlineItems ? (
+            <ActivityIndicator size="large" color="#FF4D4D" style={{ marginTop: 20 }} />
+          ) : null}
           {filteredCategoryItems.length === 0 ? (
             <Text style={styles.noData}>
               No items available

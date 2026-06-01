@@ -78,19 +78,100 @@ const HomeScreen = () => {
   const menuGroups = Array.isArray(menu.groups) ? menu.groups : [];
   const menuCategories = menuGroups.flatMap(group => group.categories || []);
 
-  const displayCategories = parentCategories.length
-    ? parentCategories
-    : petpoojaCategories.length
-    ? petpoojaCategories
+  const normalizedItems = Array.isArray(AllFoodsData)
+    ? AllFoodsData.map(entry => entry?.food || entry).filter(Boolean)
+    : [];
+
+  const itemsByCategoryId = normalizedItems.reduce((acc, item) => {
+    const categoryId =
+      item?.categoryId ||
+      item?.raw?.categoryId ||
+      item?.rawPayload?.item_categoryid ||
+      item?.raw?.rawPayload?.item_categoryid;
+
+    if (!categoryId) {
+      return acc;
+    }
+
+    const key = String(categoryId);
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  const hydratedCategories = petpoojaCategories.map(category => {
+    const categoryKey = String(
+      category?.categoryId ||
+      category?.id ||
+      category?._id ||
+      category?.rawPayload?.categoryid ||
+      '',
+    );
+
+    return {
+      ...category,
+      items:
+        Array.isArray(category?.items) && category.items.length > 0
+          ? category.items
+          : itemsByCategoryId[categoryKey] || [],
+    };
+  });
+
+  const parentCategoriesWithChildren = parentCategories.map(parent => {
+    const parentKey = String(
+      parent?.parentId ||
+      parent?.rawPayload?.id ||
+      parent?.id ||
+      parent?._id ||
+      '',
+    );
+
+    const childCategories = hydratedCategories.filter(
+      category =>
+        String(
+          category?.parentId ||
+          category?.rawPayload?.parent_category_id ||
+          '',
+        ) === parentKey,
+    );
+
+    return {
+      ...parent,
+      categories: childCategories,
+    };
+  });
+
+  const displayCategories = parentCategoriesWithChildren.length
+    ? parentCategoriesWithChildren
     : menuCategories.length
     ? menuCategories
+    : hydratedCategories.length
+    ? hydratedCategories
     : [];
 
   const hour = new Date().getHours();
   const mealMoment = hour < 12 ? 'Breakfast' : hour < 17 ? 'Lunch' : 'Dinner';
   const categoryCount = displayCategories.length;
   const totalMenuItems = displayCategories.reduce(
-    (sum, category) => sum + (category?.items?.length || 0),
+    (sum, category) => {
+      if (Array.isArray(category?.items)) {
+        return sum + category.items.length;
+      }
+
+      if (Array.isArray(category?.categories)) {
+        return (
+          sum +
+          category.categories.reduce(
+            (categorySum, child) => categorySum + (child?.items?.length || 0),
+            0,
+          )
+        );
+      }
+
+      return sum;
+    },
     0,
   );
   const categorySectionTitle = `${mealMoment} Picks For You`;
@@ -99,6 +180,8 @@ const HomeScreen = () => {
     : `Discover chef specials for ${mealMoment.toLowerCase()}`;
 
   const openMenuGroup = (group) => {
+    console.log(group,"--------------------group in openMenuGroup-------------------");
+    
     dispatch(openCuisineModal(group));
   };
 
@@ -263,6 +346,8 @@ const HomeScreen = () => {
   };
 
   const openModal = (cuisineType) => {
+    console.log(cuisineType?.parentId, "--------------------cuisineType in openModal-------------------");
+    
     dispatch(openCuisineModal(cuisineType));
   };
 
@@ -556,9 +641,9 @@ const HomeScreen = () => {
                       <Image source={{ uri: categoryImage }} style={styles.categoryImage} />
                     ) : (
                       <View style={styles.categoryPlaceholder}>
-                        <Text style={styles.categoryPlaceholderText}>
+                        {/* <Text style={styles.categoryPlaceholderText}>
                           {categoryName.charAt(0).toUpperCase()}
-                        </Text>
+                        </Text> */}
                       </View>
                     )}
                   </LinearGradient>

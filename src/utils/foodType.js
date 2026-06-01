@@ -1,4 +1,4 @@
-const NON_VEG_KEYWORDS = ['non-veg', 'chicken', 'mutton', 'fish', 'meat', 'egg'];
+const NON_VEG_KEYWORDS = ['non-veg', 'chicken', 'mutton', 'fish', 'meat'];
 
 const mapAttributeToken = token => {
   const value = String(token || '').trim();
@@ -104,9 +104,9 @@ export const getFoodTypeTokens = item => {
 export const getFoodTypeMeta = item => {
   const tokens = getFoodTypeTokens(item);
 
-  const isNonVeg = tokens.includes('non-veg') || tokens.some(token => NON_VEG_KEYWORDS.includes(token));
   const isEgg = tokens.includes('egg');
-  const isVeg = !isNonVeg && !isEgg && tokens.includes('veg');
+  const isNonVeg = !isEgg && (tokens.includes('non-veg') || tokens.some(token => NON_VEG_KEYWORDS.includes(token)));
+  const isVeg = tokens.includes('veg') && !isNonVeg && !isEgg;
 
   return {
     isVeg,
@@ -122,14 +122,14 @@ export const shouldIncludeByVegFilter = (item, isVegFilter) => {
     return true;
   }
 
-  const { isVeg, isNonVeg } = getFoodTypeMeta(item);
+  const { isVeg, isNonVeg, isEgg } = getFoodTypeMeta(item);
 
   if (isVegFilter === true) {
-    // veg filter ON: show only veg items
+    // veg filter ON: show only explicitly veg items
     return isVeg;
   }
 
-  // non-veg filter ON: show non-veg AND egg items
-  // also include items whose type could not be determined (unknown) to avoid hiding everything
-  return isNonVeg || (!isVeg);
+  // non-veg filter ON: show non-veg, egg, and unknown items
+  const isUnknown = !isVeg && !isNonVeg && !isEgg;
+  return isNonVeg || isEgg || isUnknown;
 };

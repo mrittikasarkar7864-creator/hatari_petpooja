@@ -71,7 +71,7 @@ const HomeScreen = () => {
         fetchFoodPagination({
           page: 1,
           limit: 10,
-          type: isVeg ? 'veg' : 'non-veg',
+          type: isVeg === null ? '' : isVeg ? 'veg' : 'non-veg',
           restaurantId,
         }),
       );
@@ -87,7 +87,7 @@ const HomeScreen = () => {
         fetchFoodPagination({
           page: page + 1,
           limit: 9,
-          type: isVeg ? 'veg' : 'non-veg',
+          type: isVeg === null ? '' : isVeg ? 'veg' : 'non-veg',
           restaurantId,
         }),
       );
@@ -350,7 +350,7 @@ const HomeScreen = () => {
                     fetchFoodPagination({
                       page: page + 1,
                       limit: 9,
-                      type: isVeg ? 'veg' : 'non-veg',
+                      type: isVeg === null ? '' : isVeg ? 'veg' : 'non-veg',
                       restaurantId,
                     }),
                   );
