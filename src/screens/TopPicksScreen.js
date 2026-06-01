@@ -51,6 +51,8 @@ const TopPicksScreen = () => {
     : [];
   const hasInlineItems = categoryItems.length > 0;
   const isVeg = useSelector((state) => state.foodFilter?.isVeg);
+  const resolvedIsVeg = isVeg === null ? true : isVeg;
+  const apiType = resolvedIsVeg ? "veg" : "non-veg";
   const selectedRestaurant = useSelector(
     state => state.experience?.selectedRestaurant,
   );
@@ -93,6 +95,52 @@ const TopPicksScreen = () => {
     categoryData?.parentCategoryId ||
     "";
 
+  const normalizeTopPicksItem = useCallback((item) => {
+    if (!item) {
+      return item;
+    }
+
+    const source = item?.food || item;
+    const attr = String(
+      source?.attribute ||
+      source?.rawPayload?.item_attributeid ||
+      source?.raw?.attribute ||
+      source?.raw?.rawPayload?.item_attributeid ||
+      "",
+    ).trim();
+
+    const nameText = String(source?.name || source?.rawPayload?.itemname || "").toLowerCase();
+
+    const fallbackType =
+      attr === "1"
+        ? "veg"
+        : attr === "2"
+        ? "non-veg"
+        : attr === "24" || attr === "3"
+        ? "egg"
+        : nameText.includes("chicken") ||
+          nameText.includes("mutton") ||
+          nameText.includes("fish") ||
+          nameText.includes("prawn")
+        ? "non-veg"
+        : "";
+
+    if (item?.food) {
+      return {
+        ...item,
+        food: {
+          ...item.food,
+          type: item?.food?.type || fallbackType,
+        },
+      };
+    }
+
+    return {
+      ...item,
+      type: item?.type || fallbackType,
+    };
+  }, []);
+
   const loadCategoryItems = useCallback(async () => {
     if (!restaurantId || !selectedCategoryId) {
       setFetchedItems([]);
@@ -107,6 +155,7 @@ const TopPicksScreen = () => {
           restaurantId,
           parentCategoryId: selectedParentCategoryId,
           categoryId: selectedCategoryId,
+          type: apiType,
           page: 1,
           limit: 100,
           search: "",
@@ -116,13 +165,13 @@ const TopPicksScreen = () => {
       const items = Array.isArray(response?.data?.items)
         ? response.data.items
         : [];
-      setFetchedItems(items);
+      setFetchedItems(items.map(normalizeTopPicksItem));
     } catch (e) {
       setFetchedItems([]);
     } finally {
       setLoadingItems(false);
     }
-  }, [restaurantId, selectedCategoryId, selectedParentCategoryId]);
+  }, [restaurantId, selectedCategoryId, selectedParentCategoryId, normalizeTopPicksItem, apiType]);
 
   useEffect(() => {
     if (hasInlineItems) {
@@ -132,9 +181,9 @@ const TopPicksScreen = () => {
     loadCategoryItems();
   }, [hasInlineItems, loadCategoryItems]);
 
-  const sourceItems = hasInlineItems ? categoryItems : fetchedItems;
+  const sourceItems = (hasInlineItems ? categoryItems : fetchedItems).map(normalizeTopPicksItem);
   const filteredCategoryItems = sourceItems.filter(item =>
-    shouldIncludeByVegFilter(item, isVeg)
+    shouldIncludeByVegFilter(item?.food || item, resolvedIsVeg)
   );
 
   // Animation
@@ -221,25 +270,27 @@ const TopPicksScreen = () => {
     const addAndNavigate = async () => {
       try {
         const restaurantId = getRestaurantId(selectedRestaurant);
-        const addResult = await dispatch(
+        await dispatch(
           addItemToPetpoojaCart({
             restaurantId,
             cartItem: localCartItem,
           })
         ).unwrap();
 
-        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
-
         closeModal();
-        navigation.navigate("OderCartScreen", {
-          petpoojaCartData: cartResponse?.cart || addResult?.data?.cart || null,
-          fromPetpoojaSync: true,
-        });
+        setBottomBoxVisible(true);
+        boxAnim.setValue(150);
+        Animated.timing(boxAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
       } catch (e) {
         closeModal();
 
         // Keep current UX if API fails
         setBottomBoxVisible(true);
+        boxAnim.setValue(150);
         Animated.timing(boxAnim, {
           toValue: 0,
           duration: 400,
@@ -253,13 +304,29 @@ const TopPicksScreen = () => {
 
   // Go to cart
   const handleGoToCart = () => {
+    const navigateToCart = async () => {
+      try {
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        navigation.navigate("OderCartScreen", {
+          petpoojaCartData: cartResponse?.cart || null,
+          fromPetpoojaSync: true,
+        });
+      } catch (e) {
+        navigation.navigate("OderCartScreen", {
+          petpoojaCartData: null,
+          fromPetpoojaSync: true,
+        });
+      }
+    };
+
     Animated.timing(boxAnim, {
       toValue: 150,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => setBottomBoxVisible(false));
-
-    navigation.navigate("OderCartScreen");
+    }).start(() => {
+      setBottomBoxVisible(false);
+      navigateToCart();
+    });
   };
 
   // Refresh
@@ -332,13 +399,13 @@ const TopPicksScreen = () => {
             ₹{item.price}
           </Text>
 
-          <Text
+          {/* <Text
             style={styles.description}
             numberOfLines={2}
           >
             {item.rawPayload?.itemdescription ||
               "Delicious food item"}
-          </Text>
+          </Text> */}
         </View>
 
         <TouchableOpacity

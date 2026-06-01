@@ -23,6 +23,7 @@ import { fetchRestaurants } from '../../redux/slice/AllRestaurantSlice';
 import { fetchBanners } from '../../redux/slice/BannerSlice';
 import { fetchAllFoodCat } from '../../redux/slice/foodCategorySlice';
 import { fetchFoodPagination } from '../../redux/slice/SearchFoodPaginationSlice';
+import { fetchPetpoojaCart } from '../../redux/slice/CartApiSlice';
 import Theme from '../../assets/theme';
 import {
   getClosedHoursMessage,
@@ -91,6 +92,21 @@ const HomeScreen = () => {
           restaurantId,
         }),
       );
+    }
+  };
+
+  const handleGoToCart = async () => {
+    try {
+      const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+      navigation.navigate('OderCartScreen', {
+        petpoojaCartData: cartResponse?.cart || null,
+        fromPetpoojaSync: true,
+      });
+    } catch (e) {
+      navigation.navigate('OderCartScreen', {
+        petpoojaCartData: null,
+        fromPetpoojaSync: true,
+      });
     }
   };
 
@@ -207,7 +223,7 @@ const HomeScreen = () => {
 
               <TouchableOpacity
                 style={styles.cartBtn}
-                onPress={() => navigation.navigate('OderCartScreen')}
+                onPress={handleGoToCart}
                 >
                 <Image
                   source={require('../../assets/images/cart.png')}

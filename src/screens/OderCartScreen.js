@@ -350,7 +350,7 @@ const OderCartScreen = () => {
 
             <Text
               style={styles.itemName}
-              numberOfLines={1}>
+              numberOfLines={0.9}>
               {item?.name || 'Food Item'}
             </Text>
           </View>
@@ -462,9 +462,9 @@ const OderCartScreen = () => {
       <CustomHeader title="My Cart" />
 
       <DashboardScreen scrollable={false}>
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.screen}>
           <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={styles.screen}
             behavior={
               Platform.OS === 'ios'
                 ? 'padding'
@@ -483,12 +483,7 @@ const OderCartScreen = () => {
                   },
                 )
               }>
-              <Text
-                style={{
-                  color:
-                    Theme.colors.red,
-                  fontWeight: '700',
-                }}>
+              <Text style={styles.addMoreText}>
                 + Add more Items
               </Text>
             </TouchableOpacity>
@@ -572,10 +567,7 @@ const OderCartScreen = () => {
                   showsVerticalScrollIndicator={
                     false
                   }
-                  contentContainerStyle={{
-                    paddingBottom:
-                      height * 0.18,
-                  }}
+                  contentContainerStyle={styles.listContent}
                 />
 
                 {/* BOTTOM BAR */}
@@ -585,18 +577,15 @@ const OderCartScreen = () => {
                     styles.bottomBar,
                     {
                       paddingBottom:
-                        insets.bottom ||
-                        10,
+                        Math.max(insets.bottom, 10),
                     },
                   ]}>
                   <View>
+                    <Text style={styles.bottomCaption}>
+                      Total Items
+                    </Text>
                     <Text
-                      style={{
-                        fontWeight:
-                          '700',
-                        color:
-                          '#28a745',
-                      }}>
+                      style={styles.bottomCount}>
                       {
                         cartItems.length
                       }{' '}
@@ -727,10 +716,28 @@ export default OderCartScreen;
 // ==========================================
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+  },
+
   addMore: {
     alignSelf: 'flex-end',
-    marginVertical: 10,
-    marginRight: 15,
+    marginTop: 10,
+    marginBottom: 8,
+    marginRight: 16,
+    backgroundColor: '#FFF2F2',
+    borderColor: '#FFD6D6',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+
+  addMoreText: {
+    color: Theme.colors.red,
+    fontWeight: '700',
+    fontSize: 13,
   },
 
   syncInfoCard: {
@@ -756,23 +763,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
 
   emptyText: {
-    marginTop: 10,
+    marginTop: 14,
     fontSize: 18,
     fontWeight: '700',
-    color: '#555',
+    color: '#4C4C4C',
+  },
+
+  listContent: {
+    paddingHorizontal: 2,
+    paddingTop: 4,
+    paddingBottom: 130,
   },
 
   itemCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     marginHorizontal: 12,
-    marginVertical: 6,
-    borderRadius: 12,
-    padding: 12,
-    elevation: 3,
+    marginVertical: 7,
+    borderRadius: 16,
+    padding: 13,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 5 },
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
 
   itemImage: {
@@ -784,6 +810,7 @@ const styles = StyleSheet.create({
   detailsContainer: {
     flex: 1,
     marginLeft: 12,
+    paddingRight: 78,
   },
 
   itemHeader: {
@@ -807,17 +834,18 @@ const styles = StyleSheet.create({
   },
 
   itemName: {
-    marginLeft: 5,
-    fontSize: 13,
+    marginLeft: 6,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#333',
+    color: '#232323',
     flex: 1,
   },
 
   itemPrice: {
-    marginTop: 4,
-    color: '#777',
+    marginTop: 5,
+    color: '#1A1A1A',
     fontWeight: '700',
+    fontSize: 14,
   },
 
   addonText: {
@@ -828,7 +856,7 @@ const styles = StyleSheet.create({
 
   actionRow: {
     flexDirection: 'row',
-    marginTop: 8,
+    marginTop: 10,
   },
 
   customizeBtn: {
@@ -837,7 +865,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF1F1',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 18,
     marginRight: 10,
   },
 
@@ -853,7 +881,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF1F1',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 18,
   },
 
   deleteText: {
@@ -904,7 +932,7 @@ const styles = StyleSheet.create({
   },
   quantityWrapper: { position: 'absolute', right: 12, top: 12, zIndex: 99, },
   qtyBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 30, paddingHorizontal: 8, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 5, elevation: 5,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 30, paddingHorizontal: 8, paddingVertical: 6, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 5, elevation: 4, borderWidth: 1, borderColor: '#F0F0F0',
   },
 
   qtyText: {
@@ -923,21 +951,48 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: '3%',
+    bottom: 0,
     backgroundColor: '#fff',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    elevation: 10,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#EFEFEF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: -2 },
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 12,
+      },
+    }),
+  },
+
+  bottomCaption: {
+    fontSize: 11,
+    color: '#777',
+    marginBottom: 3,
+    fontWeight: '600',
+  },
+
+  bottomCount: {
+    fontWeight: '700',
+    color: '#28a745',
+    fontSize: 14,
   },
 
   checkoutBtn: {
     backgroundColor: Theme.colors.red,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 28,
+    minWidth: 130,
+    alignItems: 'center',
   },
 
   checkoutText: {

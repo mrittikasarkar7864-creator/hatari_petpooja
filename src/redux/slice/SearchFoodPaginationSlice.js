@@ -44,6 +44,7 @@ export const fetchFoodPagination = createAsyncThunk(
           "1": "veg",
           "2": "non-veg",
           "3": "egg",
+          "24": "egg",
         };
 
         if (!normalizedAttr && knownAttrIdMap[normalizedAttrId]) {

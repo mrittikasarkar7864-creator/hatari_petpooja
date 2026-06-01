@@ -284,12 +284,29 @@ const [initialLoading, setInitialLoading] = useState(true);
   };
 
   const handleGoToCart = () => {
+    const navigateToCart = async () => {
+      try {
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        navigation.navigate('OderCartScreen', {
+          petpoojaCartData: cartResponse?.cart || null,
+          fromPetpoojaSync: true,
+        });
+      } catch (e) {
+        navigation.navigate('OderCartScreen', {
+          petpoojaCartData: null,
+          fromPetpoojaSync: true,
+        });
+      }
+    };
+
     Animated.timing(boxAnim, {
       toValue: 150,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => setBottomBoxVisible(false));
-    navigation.navigate("OderCartScreen");
+    }).start(() => {
+      setBottomBoxVisible(false);
+      navigateToCart();
+    });
   };
 
   // skeleton / shimmer row

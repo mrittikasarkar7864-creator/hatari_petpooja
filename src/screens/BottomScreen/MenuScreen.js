@@ -42,6 +42,8 @@ import {
   addItemToPetpoojaCart,
   fetchPetpoojaCart,
 } from '../../redux/slice/CartApiSlice';
+import axiosInstance from '../../global_Url/axiosInstance';
+import {API} from '../../global_Url/GlobalUrl';
 
 import {addToCart} from '../../redux/slice/cartSlice';
 
@@ -87,6 +89,8 @@ const CatItemScreen = () => {
   const [searchText, setSearchText] = useState('');
 
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchedItems, setFetchedItems] = useState([]);
+  const [loadingItems, setLoadingItems] = useState(false);
 
   const [baseTotal, setBaseTotal] = useState(0);
 
@@ -98,6 +102,7 @@ const CatItemScreen = () => {
 
   const initialLoaded = useRef(false);
   const lastResIdRef = useRef('');
+  const lastFoodTypeRef = useRef('');
   const onEndReachedDuringMomentum = useRef(true);
   const isPaginatingRef = useRef(false);
 
@@ -118,6 +123,8 @@ const CatItemScreen = () => {
     '';
 
   const resId = getRestaurantId(selectedRestaurant);
+  const foodType = isVeg === null ? '' : isVeg ? 'veg' : 'non-veg';
+  const hasInlineItems = AllFoodsData.length > 0;
 
   const isRestaurantActive =
     selectedRestaurant?.available !== false;
@@ -130,9 +137,11 @@ const CatItemScreen = () => {
     }
 
     const restaurantChanged = lastResIdRef.current !== resId;
+    const foodTypeChanged = lastFoodTypeRef.current !== foodType;
     lastResIdRef.current = resId;
+    lastFoodTypeRef.current = foodType;
 
-    if (!initialLoaded.current || restaurantChanged) {
+    if (!initialLoaded.current || restaurantChanged || foodTypeChanged) {
       initialLoaded.current = true;
 
       dispatch(clearFoods());
@@ -140,13 +149,13 @@ const CatItemScreen = () => {
         fetchFoodPagination({
           page: 1,
           limit: 10,
-          type: '',
+          type: foodType,
           search: '',
           restaurantId: resId,
         }),
       );
     }
-  }, [resId, dispatch]);
+  }, [resId, foodType, dispatch]);
 
   // ================= ANIMATION =================
 
@@ -168,6 +177,73 @@ const CatItemScreen = () => {
     }, []),
   );
 
+  const normalizeFallbackItem = useCallback(raw => {
+    const attr = String(raw?.attribute || raw?.rawPayload?.item_attributeid || '').trim();
+    const fallbackType = attr === '1' ? 'veg' : attr === '2' ? 'non-veg' : attr === '24' || attr === '3' ? 'egg' : '';
+
+    const hasVariation = Array.isArray(raw?.variations) && raw.variations.length > 0;
+    const half = raw?.variations?.[0] || {};
+    const full = raw?.variations?.[1] || raw?.variations?.[0] || {};
+
+    return {
+      food: {
+        _id: raw?.itemId || raw?._id || raw?.item_id || '',
+        name: raw?.name || raw?.rawPayload?.itemname || '',
+        image: raw?.item_image_url || raw?.rawPayload?.item_image_url || null,
+        cuisineType: raw?.cuisines?.[0] || raw?.rawPayload?.cuisine || '',
+        type: fallbackType,
+        priceInfo: {
+          hasVariation,
+          halfPrice: Number(half?.price || 0),
+          fullPrice: Number(full?.price || 0),
+          staticPrice: Number(raw?.price || raw?.rawPayload?.price || 0),
+        },
+        addOns: Array.isArray(raw?.addons)
+          ? raw.addons
+          : Array.isArray(raw?.rawPayload?.addon)
+          ? raw.rawPayload.addon
+          : [],
+        description: raw?.description || raw?.rawPayload?.itemdescription || '',
+        available: raw?.active !== false && (raw?.in_stock === undefined || Number(raw?.in_stock || 0) > 0),
+        raw,
+      },
+      _id: raw?.itemId || raw?._id || raw?.item_id || '',
+      name: raw?.name || raw?.rawPayload?.itemname || '',
+      type: fallbackType,
+    };
+  }, []);
+
+  const loadCategoryItems = useCallback(async () => {
+    if (!resId) {
+      setFetchedItems([]);
+      return;
+    }
+
+    try {
+      setLoadingItems(true);
+
+      const response = await axiosInstance.get(API.getfoodpagination, {
+        params: {
+          restaurantId: resId,
+          page: 1,
+          limit: 200,
+          search: '',
+        },
+      });
+
+      const items = Array.isArray(response?.data?.items) ? response.data.items : [];
+      setFetchedItems(items.map(normalizeFallbackItem));
+    } catch (e) {
+      setFetchedItems([]);
+    } finally {
+      setLoadingItems(false);
+    }
+  }, [resId, normalizeFallbackItem]);
+
+  useEffect(() => {
+    loadCategoryItems();
+  }, [loadCategoryItems]);
+
   // ================= REFRESH =================
 
   const onRefresh = async () => {
@@ -180,11 +256,13 @@ const CatItemScreen = () => {
         fetchFoodPagination({
           page: 1,
           limit: 10,
-          type: '',
+          type: foodType,
           search: '',
           restaurantId: resId,
         }),
       ).unwrap();
+
+      await loadCategoryItems();
     } catch (e) {
     } finally {
       setRefreshing(false);
@@ -210,7 +288,7 @@ const CatItemScreen = () => {
       fetchFoodPagination({
         page: page + 1,
         limit: 10,
-        type: '',
+        type: foodType,
         search: '',
         restaurantId: resId,
       }),
@@ -221,7 +299,40 @@ const CatItemScreen = () => {
 
   // ================= FILTER =================
 
-  const filteredFoods = AllFoodsData.filter(item => {
+  const mergeById = (primary = [], secondary = []) => {
+    const map = new Map();
+
+    primary.forEach(item => {
+      const food = item?.food || item;
+      const id =
+        food?._id ||
+        food?.id ||
+        food?.itemId ||
+        food?.itemid ||
+        item?._id;
+      map.set(String(id || Math.random()), item);
+    });
+
+    secondary.forEach(item => {
+      const food = item?.food || item;
+      const id =
+        food?._id ||
+        food?.id ||
+        food?.itemId ||
+        food?.itemid ||
+        item?._id;
+      const key = String(id || Math.random());
+      if (!map.has(key)) {
+        map.set(key, item);
+      }
+    });
+
+    return Array.from(map.values());
+  };
+
+  const sourceItems = mergeById(AllFoodsData, fetchedItems);
+
+  const filteredFoods = sourceItems.filter(item => {
     const food = item.food || item;
 
     if (!food) {
@@ -395,17 +506,20 @@ const CatItemScreen = () => {
             cartItem: localCartItem,
           }),
         ).unwrap();
-
-        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
         closeModal();
-        navigation.navigate('OderCartScreen', {
-          petpoojaCartData: cartResponse?.cart || null,
-          fromPetpoojaSync: true,
-        });
+
+        setBottomBoxVisible(true);
+        boxAnim.setValue(150);
+        Animated.timing(boxAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
       } catch (e) {
         closeModal();
         setBottomBoxVisible(true);
 
+        boxAnim.setValue(150);
         Animated.timing(boxAnim, {
           toValue: 0,
           duration: 400,
@@ -417,16 +531,28 @@ const CatItemScreen = () => {
     addAndNavigate();
   };
 
-  const handleGoToCart = () => {
+  const handleGoToCart = async () => {
+    const navigateToCart = (cartData = null) => {
+      navigation.navigate('OderCartScreen', {
+        petpoojaCartData: cartData,
+        fromPetpoojaSync: true,
+      });
+    };
+
     Animated.timing(boxAnim, {
       toValue: 150,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => {
+    }).start(async () => {
       setBottomBoxVisible(false);
-    });
 
-    navigation.navigate('OderCartScreen');
+      try {
+        const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+        navigateToCart(cartResponse?.cart || null);
+      } catch (e) {
+        navigateToCart(null);
+      }
+    });
   };
 
   // ================= RENDER ITEM =================
@@ -567,7 +693,7 @@ const renderItem = ({item}) => {
         }}>
         <Text style={styles.addText}>
           {isFoodAvailable
-            ? 'ADD +'
+            ? 'ADD '
             : 'Unavailable'}
         </Text>
       </TouchableOpacity>
@@ -630,7 +756,7 @@ const renderItem = ({item}) => {
                 paddingBottom: 140,
                 paddingHorizontal: 12,
               }}
-              onEndReached={isSearchActive ? undefined : handleLoadMore}
+              onEndReached={isSearchActive || !hasInlineItems ? undefined : handleLoadMore}
               onEndReachedThreshold={0.5}
               onMomentumScrollBegin={() => {
                 onEndReachedDuringMomentum.current = false;
@@ -642,7 +768,7 @@ const renderItem = ({item}) => {
                 />
               }
               ListFooterComponent={
-                loading && hasMore && !isSearchActive ? (
+                loading && hasMore && !isSearchActive && hasInlineItems ? (
                   <ActivityIndicator
                     size="large"
                     color="#FF4D4D"
@@ -651,7 +777,7 @@ const renderItem = ({item}) => {
                 ) : null
               }
               ListEmptyComponent={
-                loading ? (
+                loading || loadingItems ? (
                   <View style={{padding: 12}}>
                     {[...Array(6)].map((_, idx) => (
                       <View
@@ -1051,435 +1177,324 @@ export default CatItemScreen;
 
 // ================= STYLES =================
 
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F8F8',
+    paddingHorizontal: 12,
+    paddingTop: 10,
   },
+  vegBadge: {
+     position: 'absolute',
+     top: 6,
+     left: 6,
 
-  // ================= SEARCH =================
-  searchBox: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
+     width: 18,
+     height: 18,
 
-  searchInput: {
+     borderWidth: 1.5,
+     borderRadius: 4,
+
+     justifyContent: 'center',
+     alignItems: 'center',
+
+     backgroundColor: '#fff',
+   },
+
+   vegDot: {
+     width: 8,
+     height: 8,
+     borderRadius: 10,
+   },
+
+     searchInput: {
     backgroundColor: '#fff',
     height: 50,
     borderRadius: 30,
     paddingHorizontal: 20,
-    color: '#000',
-    fontSize: 15,
+     color: '#000',
+     fontSize: 15,
 
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: {
+     shadowColor: '#000',
+     shadowOpacity: 0.05,
+     shadowOffset: {
       width: 0,
-      height: 2,
-    },
+       height: 2,
+     },
     shadowRadius: 5,
 
-    elevation: 3,
+     elevation: 3,
+   },
+
+    searchBox: {
+     paddingHorizontal: 16,
+    // paddingTop: 12,
+     paddingBottom: 10,
+   },
+
+  noData: {
+    textAlign: "center",
+    marginTop: 30,
+    color: "gray",
+    fontSize: 16,
   },
 
-  // ================= FOOD CARD =================
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-
-  
-    marginVertical: 8,
-
-    borderRadius: 20,
+    flexDirection: "row",
+    backgroundColor: "#fff",
+    borderRadius: 18,
     padding: 12,
+    marginBottom: 15,
+    alignItems: "center",
+    elevation: 3,
 
-    shadowColor: '#000',
-    shadowOpacity: 0.07,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
     shadowOffset: {
       width: 0,
       height: 3,
     },
-    shadowRadius: 6,
-
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F5E9E2',
-  },
-
-  imageWrapper: {
-    position: 'relative',
+    shadowRadius: 4,
   },
 
   image: {
-    width: 95,
-    height: 95,
-    borderRadius: 16,
-    backgroundColor: '#F1F1F1',
+    width: 85,
+    height: 85,
+    borderRadius: 14,
+    backgroundColor: "#f2f2f2",
   },
 
-  vegBadge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-
-    width: 18,
-    height: 18,
-
-    borderWidth: 1.5,
-    borderRadius: 4,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    backgroundColor: '#fff',
+  details: {
+    flex: 1,
+    marginLeft: 12,
   },
 
-  vegDot: {
+  cuisine: {
+    color: "#FF4D4D",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 5,
+  },
+
+  typeIndicator: {
+    width: 15,
+    height: 15,
+    borderWidth: 1,
+    borderRadius: 3,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  typeDot: {
     width: 8,
     height: 8,
     borderRadius: 10,
   },
 
-  details: {
-    flex: 1,
-    marginLeft: 14,
-    justifyContent: 'center',
-  },
-
-  cuisine: {
-    fontSize: 12,
-    color: '#8A8A8A',
-    fontWeight: '600',
-  },
-
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-
-  typeBox: {
-    width: 14,
-    height: 14,
-    borderWidth: 1,
-    marginRight: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  typeDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 7,
-  },
-
   name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#222',
-    width: '90%',
-  },
-
-  description: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#777',
-    lineHeight: 18,
-  },
-
-  priceMain: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#E53935',
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#222",
+    marginLeft: 8,
+    width: "88%",
   },
 
   priceText: {
-    marginTop: 4,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
+    color: "#000",
+    marginTop: 6,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  description: {
+    color: "#666",
+    fontSize: 12,
+    marginTop: 5,
+    lineHeight: 18,
   },
 
   addBtn: {
-    backgroundColor: '#E53935',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 85,
-  },
-
-  disabledBtn: {
-    backgroundColor: '#BDBDBD',
+    backgroundColor: "#FF4D4D",
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
   },
 
   addText: {
-    color: '#fff',
+    color: "#fff",
+    fontWeight: "700",
     fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
 
-  // ================= SHIMMER =================
-  shimmerRow: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 12,
-    marginHorizontal: 14,
-    marginVertical: 8,
-    alignItems: 'center',
-    height: 100,
-
-    elevation: 2,
-  },
-
-  // ================= MODAL =================
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
 
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 25,
-    maxHeight: '90%',
+    backgroundColor: "#fff",
+    paddingVertical: 20,
+    paddingHorizontal: 18,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
   },
 
   modalHandle: {
-    width: 65,
+    width: 60,
     height: 6,
-    borderRadius: 10,
-    backgroundColor: '#D9D9D9',
-    alignSelf: 'center',
-    marginBottom: 18,
+    borderRadius: 3,
+    backgroundColor: "#ddd",
+    alignSelf: "center",
+    marginBottom: 15,
   },
 
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   modalImg: {
-    width: 90,
-    height: 90,
-    borderRadius: 16,
-    backgroundColor: '#F3F3F3',
-  },
-
-  modalCuisine: {
-    color: '#8A8A8A',
-    fontSize: 13,
-    marginBottom: 4,
+    width: 85,
+    height: 85,
+    borderRadius: 14,
+    backgroundColor: "#f2f2f2",
   },
 
   modalFoodName: {
-    color: '#111',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: "700",
+    color: "#222",
   },
 
-  // ================= VARIANTS =================
-  optionRow: {
-    flexDirection: 'row',
-    marginTop: 18,
-  },
-
-  optionBtn: {
-    borderWidth: 1.5,
-    borderColor: '#E53935',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginRight: 10,
-  },
-
-  selectedOption: {
-    backgroundColor: '#E53935',
-  },
-
-  optionText: {
-    color: '#E53935',
-    fontWeight: '700',
-  },
-
-  optionTextSelected: {
-    color: '#fff',
+  modalCuisine: {
+    fontSize: 14,
+    color: "#888",
+    marginBottom: 4,
   },
 
   staticPrice: {
-    marginTop: 14,
-    color: '#E53935',
-    fontWeight: '800',
-    fontSize: 20,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FF4D4D",
+    marginTop: 18,
   },
 
   modalDescription: {
-    marginTop: 14,
-    color: '#666',
+    marginTop: 12,
+    fontSize: 14,
+    color: "#555",
     lineHeight: 22,
-    fontSize: 14,
   },
 
-  // ================= ADDONS =================
-  addonTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 12,
-    marginTop: 18,
-    color: '#111',
-  },
-
-  addonItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF5F5',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-
-  addonImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    marginRight: 12,
-    backgroundColor: '#F2F2F2',
-  },
-
-  addonName: {
-    fontWeight: '700',
-    color: '#111',
-    fontSize: 14,
-  },
-
-  addonPrice: {
-    color: '#E53935',
-    marginTop: 4,
-    fontWeight: '600',
-  },
-
-  // ================= QUANTITY =================
   quantityBox: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF0F0",
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginVertical: 20,
   },
 
   qtyBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 22,
-    backgroundColor: '#FFEAEA',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
   },
 
   qtyText: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#E53935',
+    fontWeight: "700",
+    color: "#FF4D4D",
   },
 
   qtyValue: {
-    marginHorizontal: 24,
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#111',
+    marginHorizontal: 22,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#333",
   },
 
-  // ================= FOOTER =================
   modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   totalPrice: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#111',
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#222",
   },
 
   confirmBtn: {
-    backgroundColor: '#E53935',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 30,
+    backgroundColor: "#FF4D4D",
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 25,
   },
 
   confirmBtnText: {
-    color: '#fff',
-    fontWeight: '800',
+    color: "#fff",
     fontSize: 15,
+    fontWeight: "700",
   },
 
-  // ================= BOTTOM BOX =================
+  // Bottom Box
   bottomBox: {
-    position: 'absolute',
-    bottom: Platform.OS === 'android' ? 90 : 60,
-    width: '100%',
+    position: "absolute",
+    bottom: Platform.OS === "android" ? 90 : 50,
+    width: "100%",
     paddingHorizontal: 16,
   },
 
   bottomGradient: {
-    padding: 18,
-    borderRadius: 22,
+    padding: 16,
+    borderRadius: 20,
   },
 
   bottomMsg: {
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 12,
-    fontWeight: '700',
-    fontSize: 14,
+    color: "#fff",
+    textAlign: "center",
+    marginBottom: 10,
+    fontWeight: "600",
   },
 
   bottomBtn: {
-    backgroundColor: '#fff',
-    paddingVertical: 12,
+    backgroundColor: "#fff",
+    paddingVertical: 10,
     paddingHorizontal: 30,
-    borderRadius: 30,
-    alignSelf: 'center',
+    borderRadius: 20,
+    alignSelf: "center",
   },
 
   bottomBtnText: {
-    color: '#E53935',
-    fontWeight: '800',
-    fontSize: 14,
+    fontWeight: "700",
+    color: "#FF4D4D",
   },
+     shimmerRow: {
+     flexDirection: 'row',
+     backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 12,
+     marginHorizontal: 14,
+     marginVertical: 8,
+     alignItems: 'center',
+    height: 100,
 
-  // ================= CLOSED =================
-  closedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-  },
-
-  closedTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#E53935',
-  },
-
-  closedSubtitle: {
-    marginTop: 10,
-    color: '#777',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
+    elevation: 2,
   },
 });

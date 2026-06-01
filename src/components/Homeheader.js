@@ -10,6 +10,7 @@ import {
   Dimensions,
   Platform,
   SafeAreaView,
+  AppState,
 } from 'react-native';
 
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,6 +29,7 @@ import {
   getNearbybranches,
   sortBranchesByDistance,
 } from '../utils/locationHelper';
+import {fetchPetpoojaCart} from '../redux/slice/CartApiSlice';
 
 const {width} = Dimensions.get('window');
 
@@ -54,23 +56,67 @@ const {
   error,
 } = useSelector(state => state.cartPetpooja);
 
+  const cartItems = Array.isArray(cartData?.items)
+    ? cartData.items
+    : [];
+const localCartItems = useSelector(
+  state => state.cart?.items || [],
+);
+
 // =============================
 // TOTAL CART COUNT
 // =============================
 const totalCount = useMemo(() => {
-  // cartData is object → cartData.items contains array
-  if (!cartData?.items || !Array.isArray(cartData.items)) {
-    return 0;
-  }
+  const petpoojaItems = Array.isArray(cartData?.items)
+    ? cartData.items
+    : Array.isArray(cartData?.cart?.items)
+    ? cartData.cart.items
+    : [];
 
-  return cartData.items.reduce(
+  const petpoojaCount = petpoojaItems.reduce(
     (total, item) => total + Number(item?.quantity || 0),
     0,
   );
-}, [cartData]);
+
+  const localCount = localCartItems.reduce(
+    (total, item) => total + Number(item?.quantity || 1),
+    0,
+  );
+
+  return petpoojaCount || localCount;
+}, [cartData, localCartItems]);
 
 console.log('Cart Data:', cartData);
 console.log('Total Count:', totalCount);
+
+const handleGoToCart = async () => {
+  try {
+    const cartResponse = await dispatch(fetchPetpoojaCart()).unwrap();
+    navigation.navigate('OderCartScreen', {
+      petpoojaCartData: cartResponse?.cart || null,
+      fromPetpoojaSync: true,
+    });
+  } catch (e) {
+    navigation.navigate('OderCartScreen', {
+      petpoojaCartData: null,
+      fromPetpoojaSync: true,
+    });
+  }
+};
+
+useEffect(() => {
+  dispatch(fetchPetpoojaCart());
+
+  const subscription = AppState.addEventListener('change', nextState => {
+    if (nextState === 'active') {
+      dispatch(fetchPetpoojaCart());
+    }
+  });
+
+  return () => {
+    subscription.remove();
+  };
+}, [dispatch]);
 
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -319,22 +365,18 @@ console.log('Total Count:', totalCount);
               <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.cartContainer}
-                onPress={() =>
-                  navigation.navigate(
-                    'OderCartScreen',
-                  )
-                }>
+                onPress={handleGoToCart}>
                 <Image
                   source={require('../assets/images/cart.png')}
                   style={styles.cartIcon}
                 />
 
-                {totalCount > 0 && (
+                {    cartItems.length > 0 && (
                   <View
                     style={styles.cartBadge}>
                     <Text
                       style={styles.cartCount}>
-                      {totalCount}
+                    {cartItems.length}
                     </Text>
                   </View>
                 )}
