@@ -68,6 +68,7 @@ const TopPicksScreen = () => {
   const totalCount = cartItems.length;
 
   const [selectedFood, setSelectedFood] = useState(null);
+  
   const [quantity, setQuantity] = useState(1);
   const [selectedAddOns, setSelectedAddOns] = useState([]);
   const [baseTotal, setBaseTotal] = useState(0);
@@ -141,6 +142,20 @@ const TopPicksScreen = () => {
     };
   }, []);
 
+  const getItemPrice = useCallback((item) => {
+    const source = item?.food || item;
+    const priceCandidate =
+      source?.price ||
+      source?.priceInfo?.staticPrice ||
+      source?.priceInfo?.fullPrice ||
+      source?.priceInfo?.halfPrice ||
+      source?.rawPayload?.price ||
+      source?.raw?.price ||
+      0;
+
+    return Number(priceCandidate || 0);
+  }, []);
+
   const loadCategoryItems = useCallback(async () => {
     if (!restaurantId || !selectedCategoryId) {
       setFetchedItems([]);
@@ -194,7 +209,7 @@ const TopPicksScreen = () => {
   useEffect(() => {
     if (!selectedFood) return;
 
-    const base = Number(selectedFood.price || 0) * quantity;
+    const base = getItemPrice(selectedFood) * quantity;
 
     const addons =
       selectedAddOns.reduce(
@@ -205,7 +220,7 @@ const TopPicksScreen = () => {
     setBaseTotal(base);
     setAddonsTotal(addons);
     setTotalPrice(base + addons);
-  }, [selectedFood, quantity, selectedAddOns]);
+  }, [selectedFood, quantity, selectedAddOns, getItemPrice]);
 
   // Open modal
   const openModal = (food) => {
@@ -244,6 +259,11 @@ const TopPicksScreen = () => {
 
     const localCartItem = {
       ...selectedFood,
+      price: getItemPrice(selectedFood),
+      priceInfo: {
+        ...selectedFood.priceInfo,
+        staticPrice: getItemPrice(selectedFood),
+      },
       id:
         selectedFood?.id ||
         selectedFood?.itemid ||
@@ -344,6 +364,7 @@ const TopPicksScreen = () => {
 
   // Render item
   const renderItem = ({ item, index }) => {
+    console.log(item,"------------------item in render"); // Debug log
     const typeMeta = getFoodTypeMeta(item);
 
     const imageUri =
@@ -396,7 +417,7 @@ const TopPicksScreen = () => {
           </View>
 
           <Text style={styles.priceText}>
-            ₹{item.price}
+            ₹{getItemPrice(item)}
           </Text>
 
           {/* <Text
@@ -508,7 +529,7 @@ const TopPicksScreen = () => {
                       </View>
 
                       <Text style={styles.staticPrice}>
-                        Price: ₹{selectedFood.price}
+                        Price: ₹{getItemPrice(selectedFood)}
                       </Text>
 
                       <Text style={styles.modalDescription}>
@@ -778,6 +799,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FF4D4D",
     marginTop: 18,
+    color: "#222",
   },
 
   modalDescription: {
