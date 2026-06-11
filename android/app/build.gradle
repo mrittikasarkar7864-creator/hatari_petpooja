@@ -90,9 +90,9 @@ versionName "1.0.2"
     signingConfigs {
         release {
             storeFile file('my-hatari-key.keystore')
-            storePassword 'hatari@1234'
+            storePassword 'hatari@12348'
             keyAlias 'my-key-alias'
-            keyPassword 'hatari@1234'
+            keyPassword 'hatari@12348'
         }
            debug {
             storeFile file('debug.keystore')

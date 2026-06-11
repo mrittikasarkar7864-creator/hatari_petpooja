@@ -1296,7 +1296,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 10,
   },
-
   name: {
     fontSize: 15,
     fontWeight: "700",
@@ -1304,11 +1303,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     width: "88%",
   },
-
   priceText: {
     color: "#000",
     marginTop: 6,
     fontSize: 15,
+    fontWeight: "700",
+  },
+  priceMain: {
+    color: "#000",
+    marginTop: 6,
+    fontSize: 18,
     fontWeight: "700",
   },
 

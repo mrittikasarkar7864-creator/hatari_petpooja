@@ -38,7 +38,7 @@ buildscript {
         // playServicesVersion = "21.0.1"
         // googlePlayServicesVersion = "18.2.0"
 // googlePlayServicesLocationVersion = "21.0.1"
-playServicesVersion = "18.2.0"
+// playServicesVersion = "18.2.0" *
 // playServicesLocationVersion = "21.0.1"
     }
     repositories {

@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
+import React, { useEffect, useState } from 'react';
+import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import Bottom from './Bottom';
@@ -31,7 +31,7 @@ const Stack = createStackNavigator();
 
 const StackNav = () => {
 
-  
+
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
 
@@ -44,7 +44,7 @@ const StackNav = () => {
         console.log('Error reading AsyncStorage:', err);
       } finally {
         setLoading(false);
-      } 
+      }
     };
     checkLogin();
   }, []);
@@ -57,133 +57,133 @@ const StackNav = () => {
     <Stack.Navigator
       initialRouteName={userToken ? 'ExperienceScreen' : 'Splash'}
       screenOptions={{
-        headerStyle: {backgroundColor: '#ffffff'},
-        headerTitleStyle: {fontWeight: 'bold', fontSize: 20},
+        headerStyle: { backgroundColor: '#ffffff' },
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 20 },
         headerTintColor: '#000000',
       }}>
-  
-       
-          <Stack.Screen
-            name="LoginScreen"
-            component={LoginScreen}
-            options={{headerShown: false}}
-          />
-          <Stack.Screen
-            name="OtpScreen"
-            component={OtpScreen}
-            options={{headerShown: false}}
-          />
-      
-    
+
+
+      <Stack.Screen
+        name="LoginScreen"
+        component={LoginScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="OtpScreen"
+        component={OtpScreen}
+        options={{ headerShown: false }}
+      />
+
+
       <Stack.Screen
         name="Splash"
         component={Splash}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ExperienceScreen"
         component={ExperienceScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="FoodDetailScreen"
         component={FoodDetailScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="CatItemScreen"
         component={CatItemScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
-    
+
       <Stack.Screen
-      name='OrderSummaryScreen'
-      component={OrderSummaryScreen}
-      options={{headerShown:false}}
+        name='OrderSummaryScreen'
+        component={OrderSummaryScreen}
+        options={{ headerShown: false }}
       />
-            <Stack.Screen
-      name='MapScreen'
-      component={MapScreen}
-      options={{headerShown:false}}
+      <Stack.Screen
+        name='MapScreen'
+        component={MapScreen}
+        options={{ headerShown: false }}
       />
-                  <Stack.Screen
-      name='OrderSuccessScreen'
-      component={OrderSuccessScreen}
-      options={{headerShown:false}}
-      />
-
-       <Stack.Screen
-      name='SearchScreen'
-      component={SearchScreen}
-      options={{headerShown:false}}
-      />
- 
-
-      <Stack.Screen 
-      name='ItemDetalis'
-      component={ItemDetalis}
-      options={{headerShown:false}}
-      />
-      <Stack.Screen 
-      name='OrderDetailsScreen'
-      component={OrderDetailsScreen}
-      options={{headerShown:false}}
-      />
-         <Stack.Screen 
-      name='OderCartScreen'
-      component={OderCartScreen}
-      options={{headerShown:false}}
+      <Stack.Screen
+        name='OrderSuccessScreen'
+        component={OrderSuccessScreen}
+        options={{ headerShown: false }}
       />
 
-             <Stack.Screen 
-      name='CouponesScreen'
-      component={CouponesScreen}
-      options={{headerShown:false}}
+      <Stack.Screen
+        name='SearchScreen'
+        component={SearchScreen}
+        options={{ headerShown: false }}
       />
-               <Stack.Screen 
-      name='TopPicksScreen'
-      component={TopPicksScreen}
-      options={{headerShown:false}}
+
+
+      <Stack.Screen
+        name='ItemDetalis'
+        component={ItemDetalis}
+        options={{ headerShown: false }}
       />
-                     <Stack.Screen 
-      name='SaveAddressModal'
-      component={SaveAddressModal}
-      options={{headerShown:false}}
+      <Stack.Screen
+        name='OrderDetailsScreen'
+        component={OrderDetailsScreen}
+        options={{ headerShown: false }}
       />
-                         <Stack.Screen 
-      name='CuisineTypeSubCat'
-      component={CuisineTypeSubCat}
-      options={{headerShown:false}}
+      <Stack.Screen
+        name='OderCartScreen'
+        component={OderCartScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen
+        name='CouponesScreen'
+        component={CouponesScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name='TopPicksScreen'
+        component={TopPicksScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name='SaveAddressModal'
+        component={SaveAddressModal}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name='CuisineTypeSubCat'
+        component={CuisineTypeSubCat}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="Bottom"
         component={Bottom}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="PrivacyPolicyScreen"
         component={PrivacyPolicyScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
 
-          <Stack.Screen
+      <Stack.Screen
         name="TermsConditionsScreen"
         component={TermsConditionsScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
-            <Stack.Screen
+      <Stack.Screen
         name="SupportHelpScreen"
         component={SupportHelpScreen}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
 
 
 
 
-      
-      
+
+
     </Stack.Navigator>
   );
 };

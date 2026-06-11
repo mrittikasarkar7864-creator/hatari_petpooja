@@ -153,6 +153,7 @@ const ItemDetalis = () => {
           showsVerticalScrollIndicator={false}>
 
           {orderData.map((item, index) => {
+            console.log(item,"-----------------each order item in order screen");
             const foodItems = item?.items || [];
             const customer = item?.customer || {};
             const deliveryAddress =
